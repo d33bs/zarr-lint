@@ -27,9 +27,13 @@ error[array/rank-mismatch] temperature/.zarray
 
 ## Install
 
-Requires Rust 1.82 or newer.
+From PyPI (installs the `zarr-lint` command and a Python API):
 
-Build from source:
+```bash
+pip install zarr-lint
+```
+
+From source with Cargo (requires Rust 1.82+):
 
 ```bash
 cargo install --path crates/zarr-lint-cli
@@ -94,6 +98,20 @@ JSON output:
 }
 ```
 
+## Python API
+
+The PyPI package ships the same `zarr-lint` command plus a small Python API. The
+report matches the CLI's JSON schema:
+
+```python
+import zarr_lint
+
+zarr_lint.__version__          # "0.0.1"
+report = zarr_lint.lint("images.zarr")
+report["diagnostics"]          # list of {rule, severity, path, message, ...}
+zarr_lint.rules()              # the built-in rule registry
+```
+
 ## Rules
 
 `v0.0.1` includes six rules, all defaulting to `error`:
@@ -122,11 +140,12 @@ Details and per-rule fixtures: [docs/rules.md](docs/rules.md).
 
 **Included in `v0.0.1`:** local filesystem stores; Zarr v2 and v3 group/array
 recognition; JSON metadata parsing; a minimal normalized model; the six rules
-above; text and JSON output; stable exit codes; a documented test corpus.
+above; text and JSON output; stable exit codes; a documented test corpus; and
+Python bindings (CLI + API) published to PyPI.
 
 **Not yet included:** full specification conformance, chunk decoding, complete
-codec validation, S3/HTTP stores, Python bindings, SARIF output, automated
-repair, user-defined rule plugins, and OME-Zarr / Xarray-specific validation.
+codec validation, S3/HTTP stores, SARIF output, automated repair, user-defined
+rule plugins, and OME-Zarr / Xarray-specific validation.
 
 ## Development
 

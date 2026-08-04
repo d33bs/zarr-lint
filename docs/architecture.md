@@ -25,13 +25,22 @@ returns a serializable [`Report`].
 
 ## Crates
 
-For `v0.0.1` two crates are sufficient. Additional store, rule-pack, and Python
-crates can be extracted later when real implementation pressure justifies them.
+The core linting engine lives in two crates; a thin third crate provides the
+Python bindings. Additional store and rule-pack crates can be extracted later
+when real implementation pressure justifies them.
 
-| Crate            | Responsibility                                             |
-| ---------------- | ---------------------------------------------------------- |
-| `zarr-lint-core` | Discovery, parsing, the normalized model, and the rules.   |
-| `zarr-lint-cli`  | Argument parsing, text/JSON reporting, and exit codes.     |
+| Crate              | Responsibility                                            |
+| ------------------ | -------------------------------------------------------- |
+| `zarr-lint-core`   | Discovery, parsing, the normalized model, and the rules. |
+| `zarr-lint-cli`    | The CLI, exposed as a library (`run`) plus a thin binary. |
+| `zarr-lint-python` | pyo3 bindings: a `_native` module wrapping the above.     |
+
+The CLI logic lives in the `zarr-lint-cli` **library**, so the native binary and
+the Python console script (`zarr-lint`) run byte-for-byte the same code — the
+Python entry point simply calls `zarr_lint_cli::run` through pyo3. The bindings
+crate is a pyo3 extension module (`crate-type = ["cdylib"]`, `abi3-py311`) and is
+built with maturin; it is excluded from the Cargo `default-members` because a
+plain `cargo build` cannot link an extension module.
 
 ### `zarr-lint-core` modules
 
@@ -97,9 +106,10 @@ order. Directory traversal is itself sorted by file name.
 ## Explicit non-goals for `v0.0.1`
 
 Full specification conformance, chunk decoding, complete codec validation, S3
-and HTTP stores, Python bindings, SARIF output, automated repair, user-defined
-rule plugins, and domain-specific (OME-Zarr, Xarray) validation are all out of
-scope. `zarr-lint` makes **no claim** of complete Zarr specification validation.
+and HTTP stores, SARIF output, automated repair, user-defined rule plugins, and
+domain-specific (OME-Zarr, Xarray) validation are all out of scope. `zarr-lint`
+makes **no claim** of complete Zarr specification validation. (Python bindings,
+originally deferred, are now included — see the crate table above.)
 
 [`Report`]: ../crates/zarr-lint-core/src/lib.rs
 [`ZarrNode`]: ../crates/zarr-lint-core/src/model.rs

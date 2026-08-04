@@ -2,6 +2,15 @@
 members = [
   "crates/zarr-lint-cli",
   "crates/zarr-lint-core",
+  "crates/zarr-lint-python",
+]
+# The Python bindings crate is a pyo3 extension module: a plain `cargo build`
+# cannot link it (Python symbols resolve at import time), so it is left out of
+# the default set. Build and test it through maturin instead. `cargo fmt` and
+# `cargo clippy` (check-only) still cover it via `--workspace`.
+default-members = [
+  "crates/zarr-lint-cli",
+  "crates/zarr-lint-core",
 ]
 resolver = "2"
 
@@ -19,6 +28,7 @@ rust-version = "1.82"
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["derive"] }
+pyo3 = "0.29"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"

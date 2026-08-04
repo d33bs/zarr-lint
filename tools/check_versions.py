@@ -25,9 +25,11 @@ import argparse
 import json
 import re
 import subprocess
+import tomllib
+from pathlib import Path
 
 # Crates that are part of the public release surface and must share the version.
-PUBLISHABLE = {"zarr-lint-core", "zarr-lint-cli"}
+PUBLISHABLE = {"zarr-lint-core", "zarr-lint-cli", "zarr-lint-python"}
 
 # Accepts tags like ``v0.0.1`` or ``0.0.1`` with an optional pre-release/build
 # suffix, mirroring the pattern used by the sibling arrow-lint project.
@@ -62,6 +64,26 @@ def cli_reported_version() -> str:
     return parts[1]
 
 
+def check_pyproject_dynamic_version() -> None:
+    """Ensure the Python package derives its version dynamically.
+
+    The wheel version must come from the Cargo crate via maturin, so
+    ``pyproject.toml`` must declare ``version`` as dynamic and must not pin a
+    static version that could drift.
+    """
+    pyproject_path = Path("pyproject.toml")
+    if not pyproject_path.exists():
+        return
+    project = tomllib.loads(pyproject_path.read_text()).get("project", {})
+    if "version" in project:
+        raise SystemExit(
+            "pyproject.toml [project] must not pin a static version; "
+            "the version is derived from Cargo dynamically"
+        )
+    if "version" not in project.get("dynamic", []):
+        raise SystemExit('pyproject.toml [project] must declare dynamic = ["version"]')
+
+
 def version_from_tag(tag: str) -> str:
     match = TAG_PATTERN.match(tag)
     if not match:
@@ -94,7 +116,8 @@ def main() -> int:
     if missing:
         raise SystemExit(f"missing expected publishable crates: {sorted(missing)}")
 
-    checked = [f"{len(versions)} crates"]
+    check_pyproject_dynamic_version()
+    checked = [f"{len(versions)} crates", "pyproject dynamic version"]
 
     if not args.skip_cli:
         reported = cli_reported_version()

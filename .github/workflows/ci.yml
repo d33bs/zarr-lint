@@ -51,8 +51,10 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      # `default-members` excludes the pyo3 crate (it cannot be plain-`cargo`
+      # linked); it is built and tested in the `python` job via maturin.
       - name: Run tests
-        run: cargo test --workspace --all-features
+        run: cargo test --all-features
 
   # The single source of truth for the version must stay consistent.
   version-consistency:
@@ -88,3 +90,37 @@ jobs:
         uses: j178/prek-action@v2.0.6
         env:
           SKIP: cargo-fmt,cargo-clippy
+
+  # Build the pyo3 extension and exercise the Python package end to end.
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      # Clippy the bindings crate (check-only, so it links nothing).
+      - name: Clippy Python bindings
+        run: cargo clippy -p zarr-lint-python --all-features -- -D warnings
+      - name: Create environment and install tooling
+        run: |
+          uv venv
+          uv pip install 'maturin>=1.9,<2' pytest
+      - name: Build and install the extension (editable)
+        run: uv run maturin develop --uv
+      - name: Run Python tests
+        run: uv run pytest

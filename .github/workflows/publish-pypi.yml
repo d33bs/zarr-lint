@@ -1,0 +1,114 @@
+---
+# Build wheels + sdist and publish to PyPI when a GitHub release is published.
+#
+# The version is derived dynamically from the Cargo workspace version by
+# maturin; the `verify` job gates the whole run on the release tag agreeing with
+# that version.
+#
+# Publishing uses PyPI Trusted Publishing (OIDC), so no API token is stored.
+# One-time setup on PyPI (done by a maintainer): add a trusted publisher for
+# this repository with workflow `publish-pypi.yml` and environment `pypi`.
+name: publish pypi
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Gate: the release tag must match the Cargo/pyproject version.
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Verify tag matches the project version
+        run: python tools/check_versions.py --tag "${{ github.event.release.tag_name }}"
+
+  wheels:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64
+          - runner: ubuntu-24.04-arm
+            target: aarch64
+          - runner: macos-14
+            target: aarch64
+          - runner: macos-14
+            target: x86_64
+          - runner: windows-latest
+            target: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # abi3 (see the pyo3 crate) yields a single forward-compatible wheel per
+      # platform for CPython 3.11+.
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          manylinux: auto
+          sccache: "true"
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.runner }}-${{ matrix.target }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: [wheels, sdist]
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      # Mandatory for PyPI Trusted Publishing (OIDC).
+      id-token: write
+    steps:
+      - name: Download all distributions
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: List distributions
+        run: ls -l dist
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.1

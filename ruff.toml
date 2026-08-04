@@ -1,11 +1,15 @@
-# Ruff configuration for zarr-lint's Python helper scripts under tools/.
-# The project is Rust; these scripts only support versioning and fixture
-# generation, so the lint surface is kept small and deterministic.
+# Ruff configuration for zarr-lint's Python code: the packaged module under
+# src/zarr_lint/ and the helper scripts under tools/. The project is Rust; the
+# Python surface is small, so the lint set is kept tight and deterministic.
 line-length = 88
-target-version = "py39"
+target-version = "py311"
 
 [lint]
 # Pyflakes (F) plus the logical-error subset of pycodestyle (E4/E7/E9). This is
 # ruff's documented default, pinned explicitly so results do not drift with
 # ruff's version.
 select = ["E4", "E7", "E9", "F"]
+
+# Re-exports in package __init__ files are intentional.
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]

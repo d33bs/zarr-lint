@@ -92,13 +92,13 @@ It checks that:
 1. Every workspace crate resolves to the same version.
 2. The crates expected to be published are present.
 3. The CLI reports that version.
-4. A supplied release tag equals `v<version>`.
+4. `pyproject.toml` declares the version as dynamic (never static).
+5. A supplied release tag equals `v<version>`.
 
-## Future Python packaging
+## Python packaging
 
-Python bindings are **not** part of `v0.0.1`. When they are introduced, the
-Python package must also derive its version dynamically rather than duplicating
-it:
+The Python package derives its version dynamically from the same Cargo source;
+it never pins its own:
 
 ```toml
 [project]
@@ -106,7 +106,20 @@ name = "zarr-lint"
 dynamic = ["version"]
 ```
 
-Maturin would then source the version from the Rust crate, keeping the single
-source of truth intact.
+Maturin sources the version from the `zarr-lint-python` crate (which inherits
+the workspace version), so `pip install zarr-lint` and `zarr-lint --version`
+report the same value. The build is proven end to end:
+
+```console
+$ maturin build --release
+📦 Built wheel ... zarr_lint-0.0.1-cp311-abi3-<platform>.whl
+
+$ python -c "import zarr_lint; print(zarr_lint.__version__)"
+0.0.1
+```
+
+The release workflow publishes wheels and an sdist to PyPI on a GitHub release,
+gated on the tag matching the version (see
+[`.github/workflows/publish-pypi.yml`](../.github/workflows/publish-pypi.yml)).
 
 [arrow-lint]: https://github.com/d33bs/arrow-lint
