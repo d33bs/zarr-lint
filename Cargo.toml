@@ -14,7 +14,7 @@ resolver = "2"
 version = "0.0.1"
 edition = "2021"
 license = "BSD-3-Clause"
-repository = "https://github.com/CU-DBMI/zarr-lint"
+repository = "https://github.com/d33bs/zarr-lint"
 rust-version = "1.82"
 
 [workspace.dependencies]

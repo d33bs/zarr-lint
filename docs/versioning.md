@@ -109,4 +109,4 @@ dynamic = ["version"]
 Maturin would then source the version from the Rust crate, keeping the single
 source of truth intact.
 
-[arrow-lint]: https://github.com/CU-DBMI/arrow-lint
+[arrow-lint]: https://github.com/d33bs/arrow-lint

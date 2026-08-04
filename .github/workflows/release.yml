@@ -21,13 +21,13 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Verify tag matches Cargo version
@@ -38,7 +38,7 @@ jobs:
     needs: verify
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Install Rust toolchain
@@ -73,7 +73,7 @@ jobs:
             archive: zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Install Rust toolchain
@@ -116,7 +116,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Download all build artifacts
@@ -128,8 +128,10 @@ jobs:
         run: |
           mkdir -p dist
           find staging -type f -exec cp {} dist/ \;
-          (cd dist && sha256sum *.tar.gz *.zip 2>/dev/null > SHA256SUMS || true)
-          ls -l dist
+          cd dist || exit 1
+          find . -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) \
+            -exec sha256sum {} + > SHA256SUMS
+          ls -l
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
