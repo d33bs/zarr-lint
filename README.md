@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/d33bs/zarr-lint/main/docs/assets/zarr-lint-logo.png" alt="zarr-lint" width="140">
+
 # zarr-lint
 
 Inspect, validate, and understand Zarr stores with fast structural, metadata,
