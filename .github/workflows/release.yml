@@ -1,28 +1,30 @@
 ---
-# Builds release binaries and publishes a GitHub release when a v* tag is pushed.
+# Builds release binaries and attaches them when a GitHub release is published.
 #
-# The release is gated on the git tag agreeing with the Cargo workspace version,
-# so a tag such as v0.0.1 can only ever ship artifacts whose embedded version is
-# 0.0.1.
+# The build is gated on the release tag agreeing with the Cargo workspace
+# version, so a release such as v0.0.1 can only ever ship artifacts whose
+# embedded version is 0.0.1.
 name: release
 
 on:
-  push:
-    tags: ["v*"]
+  release:
+    types: [published]
 
 permissions:
   contents: read
 
 env:
   CARGO_TERM_COLOR: always
+  RELEASE_TAG: ${{ github.event.release.tag_name }}
 
 jobs:
-  # Gate: the pushed tag must match the workspace (and therefore CLI) version.
+  # Gate: the release tag must match the workspace (and therefore CLI) version.
   verify:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.RELEASE_TAG }}
           persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -31,7 +33,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Verify tag matches Cargo version
-        run: python tools/check_versions.py --tag "${{ github.ref_name }}"
+        run: python tools/check_versions.py --tag "${RELEASE_TAG}"
 
   # Confirm the project installs cleanly from a fresh checkout.
   install-test:
@@ -40,6 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.RELEASE_TAG }}
           persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -49,7 +52,7 @@ jobs:
         run: |
           got="$("$RUNNER_TEMP/zli/bin/zarr-lint" --version)"
           echo "installed: $got"
-          test "$got" = "zarr-lint ${GITHUB_REF_NAME#v}"
+          test "$got" = "zarr-lint ${RELEASE_TAG#v}"
 
   build:
     needs: verify
@@ -75,6 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.RELEASE_TAG }}
           persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -90,7 +94,7 @@ jobs:
         if: matrix.archive == 'tar.gz'
         shell: bash
         run: |
-          name="zarr-lint-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          name="zarr-lint-${RELEASE_TAG}-${{ matrix.target }}"
           mkdir -p dist
           tar -czf "dist/${name}.tar.gz" -C "target/${{ matrix.target }}/release" zarr-lint
           shasum -a 256 "dist/${name}.tar.gz" | awk '{print $1}' > "dist/${name}.tar.gz.sha256"
@@ -99,7 +103,7 @@ jobs:
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          $name = "zarr-lint-$env:GITHUB_REF_NAME-${{ matrix.target }}"
+          $name = "zarr-lint-$env:RELEASE_TAG-${{ matrix.target }}"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path "target/${{ matrix.target }}/release/zarr-lint.exe" -DestinationPath "dist/$name.zip"
           (Get-FileHash "dist/$name.zip" -Algorithm SHA256).Hash.ToLower() | Out-File -Encoding ascii "dist/$name.zip.sha256"
@@ -118,6 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.RELEASE_TAG }}
           persist-credentials: false
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -132,11 +137,8 @@ jobs:
           find . -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) \
             -exec sha256sum {} + > SHA256SUMS
           ls -l
-      - name: Create GitHub release
+      - name: Upload assets to GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "${GITHUB_REF_NAME}" \
-            --generate-notes \
-            dist/*
+          gh release upload "${RELEASE_TAG}" dist/* --clobber
