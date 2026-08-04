@@ -3,11 +3,6 @@
 Inspect, validate, and understand Zarr stores with fast structural, metadata,
 and compatibility checks. Built for scientific data and reproducible workflows.
 
-> **Status: `v0.0.1` — early architectural preview.**
-> This release proves one complete workflow end to end (discover → parse →
-> lint → report) with a deliberately small rule set. It is **not** a complete
-> Zarr specification validator. See [Scope](#scope).
-
 ## What it does
 
 `zarr-lint` points at a local Zarr store, recognizes Zarr v2 and v3 metadata,
@@ -114,7 +109,7 @@ zarr_lint.rules()              # the built-in rule registry
 
 ## Rules
 
-`v0.0.1` includes six rules, all defaulting to `error`:
+zarr-lint checks the following rules, each reporting at `error` severity:
 
 | Rule                                   | What it detects                                          |
 | -------------------------------------- | ------------------------------------------------------- |
@@ -138,14 +133,11 @@ Details and per-rule fixtures: [docs/rules.md](docs/rules.md).
 
 ## Scope
 
-**Included in `v0.0.1`:** local filesystem stores; Zarr v2 and v3 group/array
-recognition; JSON metadata parsing; a minimal normalized model; the six rules
-above; text and JSON output; stable exit codes; a documented test corpus; and
-Python bindings (CLI + API) published to PyPI.
-
-**Not yet included:** full specification conformance, chunk decoding, complete
-codec validation, S3/HTTP stores, SARIF output, automated repair, user-defined
-rule plugins, and OME-Zarr / Xarray-specific validation.
+zarr-lint reads store **metadata** — the `.zgroup`, `.zarray`, and `zarr.json`
+documents of local Zarr v2 and v3 stores — and reports structural and metadata
+problems. It inspects metadata rather than reading or decoding chunk data, which
+keeps checks fast and dependency-free. Coverage grows with each release; see the
+[rules](docs/rules.md).
 
 ## Development
 

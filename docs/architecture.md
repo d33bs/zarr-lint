@@ -1,8 +1,8 @@
 # Architecture
 
-This document describes the `v0.0.1` architecture. It is intentionally small:
-the goal of the first release is to prove one complete workflow end to end, not
-to model the whole Zarr specification.
+zarr-lint runs one clear workflow — discover, parse, lint, report — over a small,
+focused set of crates. The design favors a simple, well-understood core that is
+easy to extend rather than a broad model of the entire Zarr specification.
 
 ## Pipeline
 
@@ -54,7 +54,7 @@ plain `cargo build` cannot link an extension module.
   `ParseFailure`s rather than aborting the load.
 - `diagnostic` — the `Severity` and `Diagnostic` types shared by the rules and
   the reporters.
-- `rule` — the six `v0.0.1` rules and their registry (`RULES`).
+- `rule` — the rules and their registry (`RULES`).
 
 ## The normalized model
 
@@ -103,13 +103,12 @@ Findings are sorted by `(path, rule, message)` before reporting, so a given
 store always produces byte-identical output regardless of filesystem traversal
 order. Directory traversal is itself sorted by file name.
 
-## Explicit non-goals for `v0.0.1`
+## Design boundaries
 
-Full specification conformance, chunk decoding, complete codec validation, S3
-and HTTP stores, SARIF output, automated repair, user-defined rule plugins, and
-domain-specific (OME-Zarr, Xarray) validation are all out of scope. `zarr-lint`
-makes **no claim** of complete Zarr specification validation. (Python bindings,
-originally deferred, are now included — see the crate table above.)
+zarr-lint inspects store **metadata**; it does not read or decode chunk data, and
+it is not a full Zarr specification validator. It runs a focused, dependable rule
+set, and broader capabilities — remote object stores, codec validation, and
+domain-specific profiles such as OME-Zarr and Xarray — build on this same core.
 
 [`Report`]: ../crates/zarr-lint-core/src/lib.rs
 [`ZarrNode`]: ../crates/zarr-lint-core/src/model.rs

@@ -1,13 +1,13 @@
 # Rules
 
-`v0.0.1` ships six rules. Each has a stable identifier, a documented default
-severity, and both a positive fixture (which triggers it) and a negative fixture
-(which does not). The registry lives in
+Each rule has a stable identifier, a documented default severity, and both a
+positive fixture (which triggers it) and a negative fixture (which does not). The
+registry lives in
 [`crates/zarr-lint-core/src/rule.rs`](../crates/zarr-lint-core/src/rule.rs).
 
-All six default to **error** severity in this release. The `--fail-on` flag
-selects the severity at or above which findings cause a non-zero exit
-(`error` by default; also `warning` or `never`).
+Every rule defaults to **error** severity. The `--fail-on` flag selects the
+severity at or above which findings cause a non-zero exit (`error` by default;
+also `warning` or `never`).
 
 | Rule                                   | Default | What it detects                                                        |
 | -------------------------------------- | ------- | --------------------------------------------------------------------- |

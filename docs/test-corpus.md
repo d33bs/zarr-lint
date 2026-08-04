@@ -1,12 +1,14 @@
 # Test corpus
 
-The `v0.0.1` corpus has two parts:
+The test corpus has three parts:
 
 - **`test-data/upstream/duckdb-zarr/`** — a small, documented subset of real
   Zarr stores vendored from an upstream project. These are valid stores and are
   used as negative fixtures (they must produce no findings).
 - **`test-data/invalid/`** — deliberately malformed derivatives, one per rule,
   used as positive fixtures.
+- **`test-data/generated/`** — small, valid stores written by popular ecosystem
+  tools, used to guard against false positives (see below).
 
 ## Provenance
 
@@ -21,7 +23,7 @@ Upstream fixtures were copied verbatim from the
 The `idr0062A` fixture from that repository was **not** vendored: it is a
 multi-hundred-megabyte OME-Zarr image whose chunk binaries are irrelevant to a
 metadata linter. The vendored stores already cover every structural case the
-plan calls for. Do not modify the vendored upstream fixtures directly; add
+rule set exercises. Do not modify the vendored upstream fixtures directly; add
 derivatives under `test-data/invalid/` instead.
 
 ## Upstream fixtures

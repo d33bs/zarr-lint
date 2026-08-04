@@ -81,10 +81,10 @@ It is run in CI on every push and, with `--tag`, as a release gate.
 
 ```console
 $ python tools/check_versions.py
-OK: version 0.0.1 is consistent across 2 crates, CLI.
+OK: version 0.0.1 is consistent across 3 crates, pyproject dynamic version, CLI.
 
 $ python tools/check_versions.py --tag v0.0.1
-OK: version 0.0.1 is consistent across 2 crates, CLI, tag v0.0.1.
+OK: version 0.0.1 is consistent across 3 crates, pyproject dynamic version, CLI, tag v0.0.1.
 ```
 
 It checks that:
