@@ -1,0 +1,60 @@
+# Pre-commit hooks for zarr-lint. Run with `prek run --all-files`
+# (or `pre-commit run --all-files`). See https://pre-commit.com.
+#
+# Fixtures under test-data/ are excluded from mutating and spell-check hooks so
+# their bytes stay exactly as vendored or generated (provenance and deliberately
+# malformed cases must not be "fixed").
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^test-data/
+      - id: end-of-file-fixer
+        exclude: ^test-data/
+      - id: mixed-line-ending
+        exclude: ^test-data/
+      - id: check-yaml
+      - id: check-toml
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.3
+    hooks:
+      - id: codespell
+        args: [--ignore-words-list=arange]
+        exclude: |
+          (?x)^(
+              test-data/.* |
+              Cargo\.lock
+          )$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.0
+    hooks:
+      - id: ruff-format
+      - id: ruff-check
+        args: [--fix]
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  # Local Rust hooks: authoritative, no network, and identical to CI.
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --all --
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --all-targets --all-features -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false

@@ -1,0 +1,140 @@
+---
+# Builds release binaries and publishes a GitHub release when a v* tag is pushed.
+#
+# The release is gated on the git tag agreeing with the Cargo workspace version,
+# so a tag such as v0.0.1 can only ever ship artifacts whose embedded version is
+# 0.0.1.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Gate: the pushed tag must match the workspace (and therefore CLI) version.
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify tag matches Cargo version
+        run: python tools/check_versions.py --tag "${{ github.ref_name }}"
+
+  # Confirm the project installs cleanly from a fresh checkout.
+  install-test:
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: cargo install from a clean checkout
+        run: cargo install --path crates/zarr-lint-cli --root "$RUNNER_TEMP/zli"
+      - name: Installed binary reports the tag version
+        run: |
+          got="$("$RUNNER_TEMP/zli/bin/zarr-lint" --version)"
+          echo "installed: $got"
+          test "$got" = "zarr-lint ${GITHUB_REF_NAME#v}"
+
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: macos-14
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          # GitHub retired the macos-13 (Intel) runner, so build the x86_64
+          # macOS binary by cross-compiling on Apple Silicon.
+          - os: macos-14
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Build release binary
+        run: cargo build --release --package zarr-lint-cli --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          name="zarr-lint-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          mkdir -p dist
+          tar -czf "dist/${name}.tar.gz" -C "target/${{ matrix.target }}/release" zarr-lint
+          shasum -a 256 "dist/${name}.tar.gz" | awk '{print $1}' > "dist/${name}.tar.gz.sha256"
+
+      - name: Package (Windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $name = "zarr-lint-$env:GITHUB_REF_NAME-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "target/${{ matrix.target }}/release/zarr-lint.exe" -DestinationPath "dist/$name.zip"
+          (Get-FileHash "dist/$name.zip" -Algorithm SHA256).Hash.ToLower() | Out-File -Encoding ascii "dist/$name.zip.sha256"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+
+  release:
+    needs: [verify, install-test, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: staging
+          merge-multiple: true
+      - name: Assemble release assets and combined checksums
+        run: |
+          mkdir -p dist
+          find staging -type f -exec cp {} dist/ \;
+          (cd dist && sha256sum *.tar.gz *.zip 2>/dev/null > SHA256SUMS || true)
+          ls -l dist
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            dist/*
