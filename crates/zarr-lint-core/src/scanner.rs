@@ -1,12 +1,19 @@
-//! Local filesystem store discovery.
+//! Store discovery for local and remote Zarr stores.
 //!
-//! The scanner walks a directory tree and collects the Zarr metadata files it
-//! recognizes by name. It performs no JSON parsing and applies no rules; it
-//! only answers the question "where are the metadata documents, and which Zarr
-//! flavor does each file name imply?". Parsing and validation happen later in
+//! Discovery finds the Zarr metadata documents that make up a store and returns
+//! them, with their raw bytes, for parsing and linting. Two backends are
+//! supported:
+//!
+//! * **Local** (a filesystem path): the directory tree is walked and every
+//!   recognized metadata file is collected.
+//! * **Remote** (an `http://` or `https://` URL): see [`crate::remote`]. Because
+//!   HTTP offers no directory listing, remote discovery relies on consolidated
+//!   metadata, falling back to the root node.
+//!
+//! Neither backend parses JSON or applies rules; that happens later in
 //! [`crate::model`] and [`crate::rule`].
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use walkdir::WalkDir;
 
@@ -52,29 +59,30 @@ impl MetadataRole {
     }
 }
 
-/// A recognized metadata file together with its raw contents and locations.
+/// A recognized metadata document together with its raw contents and locations.
 #[derive(Debug, Clone)]
 pub struct RawMetadataFile {
     /// The role implied by the file name.
     pub role: MetadataRole,
-    /// Absolute (or as-supplied) filesystem path to the metadata file.
-    pub fs_path: PathBuf,
-    /// Store-relative path of the metadata file, using `/` separators
+    /// Where the document came from: a filesystem path or a URL, for display
+    /// and provenance.
+    pub source: String,
+    /// Store-relative path of the metadata document, using `/` separators
     /// (for example `stations/elevation/.zarray`, or `.zgroup` at the root).
     pub rel_display: String,
     /// Store-relative path of the *node* (the directory containing the file),
     /// using `/` separators. Empty string for a node at the store root.
     pub location: String,
-    /// Raw bytes of the metadata file.
+    /// Raw bytes of the metadata document.
     pub bytes: Vec<u8>,
 }
 
 /// The result of scanning a store: its root and every recognized metadata file.
 #[derive(Debug, Clone)]
 pub struct StoreScan {
-    /// The store root as supplied to [`scan_store`].
-    pub root: PathBuf,
-    /// Every recognized metadata file discovered under the root, in a
+    /// The store root as supplied to [`scan_store`] (a path or URL).
+    pub root: String,
+    /// Every recognized metadata document discovered under the root, in a
     /// deterministic (sorted) order.
     pub files: Vec<RawMetadataFile>,
 }
@@ -86,6 +94,15 @@ impl StoreScan {
     }
 }
 
+/// Options controlling how a store is accessed.
+#[derive(Debug, Clone, Default)]
+pub struct StoreOptions {
+    /// Access cloud object stores anonymously (no credentials or request
+    /// signing). When `false`, credentials are taken from the environment and
+    /// access falls back to anonymous for public data.
+    pub anonymous: bool,
+}
+
 /// Errors that prevent a store from being scanned at all.
 ///
 /// These correspond to store-access failures (CLI exit code `3`) rather than
@@ -94,37 +111,82 @@ impl StoreScan {
 pub enum ScanError {
     /// The supplied path does not exist.
     #[error("store path does not exist: {0}")]
-    NotFound(PathBuf),
+    NotFound(String),
     /// The supplied path exists but is not a directory.
     #[error("store path is not a directory: {0}")]
-    NotADirectory(PathBuf),
+    NotADirectory(String),
     /// An I/O error occurred while reading a specific path.
     #[error("failed to read {path}: {source}")]
     Io {
         /// The path that could not be read.
-        path: PathBuf,
+        path: String,
         /// The underlying I/O error.
         source: std::io::Error,
     },
     /// An error occurred while walking the directory tree.
     #[error("failed to traverse store: {0}")]
     Walk(#[source] walkdir::Error),
+    /// A remote request failed (network error or non-404 HTTP status).
+    #[error("failed to read remote store {url}: {message}")]
+    Remote {
+        /// The URL that could not be read.
+        url: String,
+        /// A description of the failure.
+        message: String,
+    },
+    /// The URL scheme is recognized but not supported.
+    #[error("unsupported URL scheme `{0}://`: only http and https are supported")]
+    UnsupportedScheme(String),
 }
 
-/// Discover the Zarr metadata files under `root`.
+/// Discover the Zarr metadata documents in the store at `target`.
 ///
-/// Returns [`ScanError`] only for store-access problems (missing path, not a
-/// directory, unreadable file). A directory that simply contains no Zarr
-/// metadata is *not* an error here; it produces an empty [`StoreScan`] whose
+/// `target` may be a local filesystem path, an `http(s)://` URL, or a cloud
+/// object-store URL (`s3://`, `gs://`, `az://`, …). Returns [`ScanError`] only
+/// for store-access problems; a location that simply contains no Zarr metadata
+/// is *not* an error here — it produces an empty [`StoreScan`] whose
 /// [`StoreScan::is_recognized`] is `false`, which the rule engine reports as
 /// `structure/unrecognized-store`.
-pub fn scan_store(root: &Path) -> Result<StoreScan, ScanError> {
+pub fn scan_store(target: &str, options: &StoreOptions) -> Result<StoreScan, ScanError> {
+    match url_scheme(target).as_deref() {
+        None => scan_local(Path::new(target)),
+        Some("http") | Some("https") => crate::remote::scan(target),
+        Some("s3") | Some("s3a") | Some("gs") | Some("gcs") | Some("az") | Some("azure")
+        | Some("abfs") | Some("abfss") => crate::cloud::scan(target, options),
+        Some(other) => Err(ScanError::UnsupportedScheme(other.to_string())),
+    }
+}
+
+/// The lowercase URL scheme of `target` (e.g. `https`), if it looks like a URL.
+///
+/// Matches `^[a-zA-Z][a-zA-Z0-9+.-]*://`, so Windows drive paths like `C:\data`
+/// (which have no `//`) are treated as local paths, not URLs.
+fn url_scheme(target: &str) -> Option<String> {
+    let bytes = target.as_bytes();
+    if bytes.is_empty() || !bytes[0].is_ascii_alphabetic() {
+        return None;
+    }
+    let mut end = 1;
+    while end < bytes.len()
+        && (bytes[end].is_ascii_alphanumeric() || matches!(bytes[end], b'+' | b'.' | b'-'))
+    {
+        end += 1;
+    }
+    if target[end..].starts_with("://") {
+        Some(target[..end].to_ascii_lowercase())
+    } else {
+        None
+    }
+}
+
+fn scan_local(root: &Path) -> Result<StoreScan, ScanError> {
+    let root_display = root.display().to_string();
     let metadata = std::fs::symlink_metadata(root).map_err(|source| {
         if source.kind() == std::io::ErrorKind::NotFound {
-            ScanError::NotFound(root.to_path_buf())
+            ScanError::NotFound(root_display.clone())
         } else {
             ScanError::Io {
-                path: root.to_path_buf(),
+                path: root_display.clone(),
                 source,
             }
         }
@@ -135,9 +197,9 @@ pub fn scan_store(root: &Path) -> Result<StoreScan, ScanError> {
         // `is_dir` follows symlinks; combine with the earlier stat so that a
         // dangling symlink surfaces as NotFound rather than NotADirectory.
         if metadata.file_type().is_symlink() && !root.exists() {
-            return Err(ScanError::NotFound(root.to_path_buf()));
+            return Err(ScanError::NotFound(root_display));
         }
-        return Err(ScanError::NotADirectory(root.to_path_buf()));
+        return Err(ScanError::NotADirectory(root_display));
     }
 
     let mut files = Vec::new();
@@ -153,13 +215,13 @@ pub fn scan_store(root: &Path) -> Result<StoreScan, ScanError> {
             continue;
         };
 
-        let fs_path = entry.path().to_path_buf();
-        let bytes = std::fs::read(&fs_path).map_err(|source| ScanError::Io {
-            path: fs_path.clone(),
+        let fs_path = entry.path();
+        let bytes = std::fs::read(fs_path).map_err(|source| ScanError::Io {
+            path: fs_path.display().to_string(),
             source,
         })?;
 
-        let rel_display = relative_display(root, &fs_path);
+        let rel_display = relative_display(root, fs_path);
         let location = rel_display
             .rsplit_once('/')
             .map(|(dir, _file)| dir.to_string())
@@ -167,7 +229,7 @@ pub fn scan_store(root: &Path) -> Result<StoreScan, ScanError> {
 
         files.push(RawMetadataFile {
             role,
-            fs_path,
+            source: fs_path.display().to_string(),
             rel_display,
             location,
             bytes,
@@ -175,7 +237,7 @@ pub fn scan_store(root: &Path) -> Result<StoreScan, ScanError> {
     }
 
     Ok(StoreScan {
-        root: root.to_path_buf(),
+        root: root_display,
         files,
     })
 }
@@ -205,9 +267,30 @@ mod tests {
         fs::write(path, contents).unwrap();
     }
 
+    fn scan_path(path: &Path) -> Result<StoreScan, ScanError> {
+        scan_store(path.to_str().unwrap(), &StoreOptions::default())
+    }
+
+    #[test]
+    fn url_scheme_detection() {
+        assert_eq!(url_scheme("https://example.com/x"), Some("https".into()));
+        assert_eq!(url_scheme("HTTP://example.com/x"), Some("http".into()));
+        assert_eq!(url_scheme("s3://bucket/x"), Some("s3".into()));
+        assert_eq!(url_scheme("/local/path/store.zarr"), None);
+        assert_eq!(url_scheme("relative/store.zarr"), None);
+        assert_eq!(url_scheme(r"C:\data\store.zarr"), None);
+    }
+
+    #[test]
+    fn unsupported_scheme_is_an_error() {
+        let err = scan_store("ftp://host/store.zarr", &StoreOptions::default()).unwrap_err();
+        assert!(matches!(err, ScanError::UnsupportedScheme(s) if s == "ftp"));
+    }
+
     #[test]
     fn missing_path_is_not_found() {
-        let err = scan_store(Path::new("/definitely/not/here/zarr-lint")).unwrap_err();
+        let err =
+            scan_store("/definitely/not/here/zarr-lint", &StoreOptions::default()).unwrap_err();
         assert!(matches!(err, ScanError::NotFound(_)));
     }
 
@@ -216,14 +299,14 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let file = tmp.path().join("plain.txt");
         fs::write(&file, "hi").unwrap();
-        let err = scan_store(&file).unwrap_err();
+        let err = scan_path(&file).unwrap_err();
         assert!(matches!(err, ScanError::NotADirectory(_)));
     }
 
     #[test]
     fn empty_directory_is_unrecognized_but_not_an_error() {
         let tmp = TempDir::new().unwrap();
-        let scan = scan_store(tmp.path()).unwrap();
+        let scan = scan_path(tmp.path()).unwrap();
         assert!(!scan.is_recognized());
         assert!(scan.files.is_empty());
     }
@@ -237,7 +320,7 @@ mod tests {
         write(tmp.path(), "v3/zarr.json", r#"{"zarr_format":3}"#);
         write(tmp.path(), "v3/c/0/0", "chunkbytes"); // must be ignored
 
-        let scan = scan_store(tmp.path()).unwrap();
+        let scan = scan_path(tmp.path()).unwrap();
         let displays: Vec<&str> = scan.files.iter().map(|f| f.rel_display.as_str()).collect();
         assert_eq!(displays, vec![".zgroup", "arr/.zarray", "v3/zarr.json"]);
 

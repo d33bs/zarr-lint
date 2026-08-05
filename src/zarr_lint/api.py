@@ -16,13 +16,16 @@ from zarr_lint import _native
 __version__: str = _native.version()
 
 
-def lint(path: str | Path) -> dict[str, Any]:
-    """Lint a local Zarr store and return the report as a dictionary.
+def lint(path: str | Path, *, anonymous: bool = False) -> dict[str, Any]:
+    """Lint a Zarr store and return the report as a dictionary.
 
-    The returned mapping has ``version``, ``store``, and ``diagnostics`` keys,
-    identical to the CLI's ``--format json`` output.
+    ``path`` may be a local path, an ``http(s)://`` URL, or a cloud
+    object-store URL (``s3://``, ``gs://``, ``az://``). Set ``anonymous`` for
+    unauthenticated access to public cloud buckets. The returned mapping has
+    ``version``, ``store``, and ``diagnostics`` keys, identical to the CLI's
+    ``--format json`` output.
     """
-    return json.loads(_native.lint_store_json(str(path)))
+    return json.loads(_native.lint_store_json(str(path), anonymous))
 
 
 def rules() -> list[dict[str, Any]]:

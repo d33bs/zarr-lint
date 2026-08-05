@@ -136,10 +136,24 @@ Details and per-rule fixtures: [docs/rules.md](docs/rules.md).
 ## Scope
 
 zarr-lint reads store **metadata** — the `.zgroup`, `.zarray`, and `zarr.json`
-documents of local Zarr v2 and v3 stores — and reports structural and metadata
+documents of Zarr v2 and v3 stores — and reports structural and metadata
 problems. It inspects metadata rather than reading or decoding chunk data, which
-keeps checks fast and dependency-free. Coverage grows with each release; see the
+keeps checks fast and lightweight. Coverage grows with each release; see the
 [rules](docs/rules.md).
+
+Stores can be **local** (a filesystem path) or **remote** over `http(s)://`,
+including public object stores reached through their HTTPS endpoints. Because
+HTTP has no directory listing, remote discovery uses the store's consolidated
+metadata (`.zmetadata`) when present, and otherwise reads the root node.
+
+```bash
+zarr-lint check path/to/store.zarr
+zarr-lint check https://example.com/data.zarr
+zarr-lint check https://bucket.s3.amazonaws.com/prefix/data.zarr
+```
+
+Native `s3://` (and `gs://`, `azure://`) access with credentials is not yet
+supported; use the equivalent `https://` URL for public data.
 
 ## Development
 

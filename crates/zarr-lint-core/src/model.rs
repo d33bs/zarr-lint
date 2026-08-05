@@ -1,12 +1,9 @@
 //! The minimal normalized Zarr model and metadata field extraction.
 //!
-//! For `v0.0.1` the model deliberately preserves the raw JSON of each metadata
-//! document and extracts only the handful of fields the initial rules need.
-//! This keeps the linter honest about how little of the Zarr specification it
-//! currently understands, while leaving room to grow into strongly typed v2 and
-//! v3 metadata structures later.
-
-use std::path::PathBuf;
+//! The model deliberately preserves the raw JSON of each metadata document and
+//! extracts only the handful of fields the rules need. This keeps the linter
+//! honest about how much of the Zarr specification it currently understands,
+//! while leaving room to grow into strongly typed v2 and v3 metadata structures.
 
 use serde_json::Value;
 
@@ -77,8 +74,8 @@ pub struct ParsedMetadata {
     pub location: String,
     /// Store-relative display path of the metadata file.
     pub rel_display: String,
-    /// Filesystem path of the metadata file.
-    pub fs_path: PathBuf,
+    /// Where the document came from: a filesystem path or a URL.
+    pub source: String,
     /// The parsed JSON value.
     pub value: Value,
 }
@@ -156,13 +153,11 @@ impl ParsedMetadata {
     /// determinable. Returns `None` for a v3 node with no usable `node_type`.
     pub fn to_node(&self) -> Option<ZarrNode> {
         let kind = self.kind()?;
-        let node_path = self.fs_path.parent().map(PathBuf::from).unwrap_or_default();
         Some(ZarrNode {
-            path: node_path,
             logical_path: self.location.clone(),
             version: self.version,
             kind,
-            metadata_path: self.fs_path.clone(),
+            source: self.source.clone(),
             metadata: self.value.clone(),
         })
     }
@@ -179,20 +174,18 @@ pub struct ParseFailure {
 
 /// The normalized representation of a single Zarr node.
 ///
-/// This is the minimal model described in the project plan: enough structure
-/// for basic checks and inspection, with the raw metadata retained verbatim.
+/// A minimal model: enough structure for basic checks and inspection, with the
+/// raw metadata retained verbatim.
 #[derive(Debug, Clone)]
 pub struct ZarrNode {
-    /// Filesystem path of the node directory.
-    pub path: PathBuf,
     /// Store-relative logical path (empty string for the store root).
     pub logical_path: String,
     /// The Zarr format version.
     pub version: ZarrVersion,
     /// Whether the node is a group or an array.
     pub kind: NodeKind,
-    /// Filesystem path of the metadata document.
-    pub metadata_path: PathBuf,
+    /// Where the metadata came from: a filesystem path or a URL.
+    pub source: String,
     /// The raw metadata JSON.
     pub metadata: Value,
 }
@@ -228,7 +221,7 @@ fn parse_file(file: &RawMetadataFile) -> Result<ParsedMetadata, ParseFailure> {
             version: file.role.version(),
             location: file.location.clone(),
             rel_display: file.rel_display.clone(),
-            fs_path: file.fs_path.clone(),
+            source: file.source.clone(),
             value,
         }),
         Err(err) => Err(ParseFailure {
@@ -262,7 +255,7 @@ mod tests {
             version: role.version(),
             location: "n".into(),
             rel_display: "n/meta".into(),
-            fs_path: PathBuf::from("/store/n/meta"),
+            source: "/store/n/meta".into(),
             value,
         }
     }

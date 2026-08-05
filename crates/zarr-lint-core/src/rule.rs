@@ -274,7 +274,7 @@ fn check_rank_mismatch(loaded: &LoadedStore, out: &mut Vec<Diagnostic>) {
 mod tests {
     use super::*;
     use crate::model;
-    use crate::scanner::scan_store;
+    use crate::scanner::{scan_store, StoreOptions};
     use std::fs;
     use std::path::Path;
     use tempfile::TempDir;
@@ -286,9 +286,10 @@ mod tests {
     }
 
     fn run(dir: &Path) -> Vec<Diagnostic> {
-        let scan = scan_store(dir).unwrap();
+        let target = dir.display().to_string();
+        let scan = scan_store(&target, &StoreOptions::default()).unwrap();
         let loaded = model::load(&scan);
-        evaluate(&scan, &loaded, &dir.display().to_string())
+        evaluate(&scan, &loaded, &target)
     }
 
     fn rule_ids(diags: &[Diagnostic]) -> Vec<&str> {

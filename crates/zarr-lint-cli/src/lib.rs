@@ -20,11 +20,10 @@
 //! in CI.
 
 use std::ffi::OsString;
-use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use zarr_lint_core::model::format_dims;
-use zarr_lint_core::{lint_store, load_store, Report, Severity};
+use zarr_lint_core::{lint_store_with, load_store, Report, Severity, StoreOptions};
 
 const ABOUT: &str = "Inspect Zarr stores for structural and metadata problems.";
 
@@ -68,8 +67,8 @@ enum Command {
 
 #[derive(Args, Clone)]
 struct CheckArgs {
-    /// Path to the Zarr store to check.
-    path: Option<PathBuf>,
+    /// Path or http(s):// URL of the Zarr store to check.
+    path: Option<String>,
 
     /// Output format.
     #[arg(long, value_enum, default_value_t = Format::Text)]
@@ -82,12 +81,20 @@ struct CheckArgs {
     /// Suppress the summary and success lines (text output only).
     #[arg(long)]
     quiet: bool,
+
+    /// Access cloud object stores anonymously (no credentials or signing).
+    #[arg(long)]
+    anonymous: bool,
 }
 
 #[derive(Args, Clone)]
 struct InspectArgs {
-    /// Path to the Zarr store to inspect.
-    path: PathBuf,
+    /// Path or http(s):// URL of the Zarr store to inspect.
+    path: String,
+
+    /// Access cloud object stores anonymously (no credentials or signing).
+    #[arg(long)]
+    anonymous: bool,
 }
 
 #[derive(Args, Clone)]
@@ -154,7 +161,10 @@ fn run_check(args: CheckArgs) -> i32 {
         return exit::USAGE;
     };
 
-    let report = match lint_store(&path) {
+    let options = StoreOptions {
+        anonymous: args.anonymous,
+    };
+    let report = match lint_store_with(&path, &options) {
         Ok(report) => report,
         Err(err) => {
             eprintln!("error: {err}");
@@ -223,7 +233,10 @@ fn print_json(report: &Report) {
 }
 
 fn run_inspect(args: InspectArgs) -> i32 {
-    let (scan, loaded) = match load_store(&args.path) {
+    let options = StoreOptions {
+        anonymous: args.anonymous,
+    };
+    let (scan, loaded) = match load_store(&args.path, &options) {
         Ok(loaded) => loaded,
         Err(err) => {
             eprintln!("error: {err}");
@@ -232,11 +245,11 @@ fn run_inspect(args: InspectArgs) -> i32 {
     };
 
     if !scan.is_recognized() {
-        println!("No Zarr metadata found in {}.", args.path.display());
+        println!("No Zarr metadata found in {}.", args.path);
         return exit::OK;
     }
 
-    println!("Store: {}", args.path.display());
+    println!("Store: {}", args.path);
     println!("Discovered {} metadata document(s):", scan.files.len());
     for node in &loaded.parsed {
         let kind = node.kind().map(|k| k.as_str()).unwrap_or("unknown");

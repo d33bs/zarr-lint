@@ -5,11 +5,9 @@
 //! structured helpers return JSON strings that the Python layer parses. This
 //! keeps behavior identical across the Rust and Python front ends.
 
-use std::path::PathBuf;
-
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use zarr_lint_core::{lint_store, RULES, VERSION};
+use zarr_lint_core::{lint_store_with, StoreOptions, RULES, VERSION};
 
 /// Run the full `zarr-lint` command line with `args` (including the program
 /// name as the first element) and return the process exit code.
@@ -18,10 +16,13 @@ fn run_cli(args: Vec<String>) -> i32 {
     zarr_lint_cli::run(args)
 }
 
-/// Lint the store at `path` and return the report as a JSON string.
+/// Lint the store at `path` (a filesystem path or URL) and return the report as
+/// a JSON string. Set `anonymous` for unauthenticated cloud object-store access.
 #[pyfunction]
-fn lint_store_json(path: String) -> PyResult<String> {
-    let report = lint_store(&PathBuf::from(path)).map_err(to_py_error)?;
+#[pyo3(signature = (path, anonymous=false))]
+fn lint_store_json(path: String, anonymous: bool) -> PyResult<String> {
+    let options = StoreOptions { anonymous };
+    let report = lint_store_with(&path, &options).map_err(to_py_error)?;
     serde_json::to_string_pretty(&report).map_err(to_py_error)
 }
 

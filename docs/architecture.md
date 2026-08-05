@@ -44,10 +44,16 @@ plain `cargo build` cannot link an extension module.
 
 ### `zarr-lint-core` modules
 
-- `scanner` — walks a local directory and collects recognized metadata files
-  (`.zgroup`, `.zarray`, `zarr.json`) by name. It does no parsing. Store-access
-  problems (missing path, not a directory, unreadable file) surface as
-  `ScanError`.
+- `scanner` — discovers recognized metadata documents (`.zgroup`, `.zarray`,
+  `zarr.json`) and dispatches on the target: a local path is walked with
+  `walkdir`, while an `http(s)://` URL is handled by the `remote` module. It does
+  no parsing. Store-access problems (missing path, network failure, unsupported
+  scheme) surface as `ScanError`.
+- `remote` — reads a store over HTTP(S). With no directory listing available, it
+  discovers nodes from consolidated metadata (`.zmetadata`, or a v3 root
+  `zarr.json` carrying `consolidated_metadata`), falling back to the root node.
+  The HTTP client is abstracted behind a `Fetcher` trait so discovery is
+  unit-tested without a network.
 - `model` — parses each discovered file into a raw `serde_json::Value`, extracts
   a few key fields (`zarr_format`, `node_type`, shape, chunk shape), and offers
   the normalized [`ZarrNode`] type. Files that fail to parse become
