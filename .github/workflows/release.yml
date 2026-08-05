@@ -84,9 +84,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
+      # Caching is intentionally omitted from release-artifact builds to avoid
+      # cache-poisoning of published binaries.
       - name: Build release binary
         run: cargo build --release --package zarr-lint-cli --target ${{ matrix.target }}
 
@@ -109,7 +108,7 @@ jobs:
           (Get-FileHash "dist/$name.zip" -Algorithm SHA256).Hash.ToLower() | Out-File -Encoding ascii "dist/$name.zip.sha256"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.target }}
           path: dist/*
@@ -125,7 +124,7 @@ jobs:
           ref: ${{ env.RELEASE_TAG }}
           persist-credentials: false
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: staging
           merge-multiple: true

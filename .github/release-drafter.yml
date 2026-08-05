@@ -1,0 +1,29 @@
+---
+# Configuration for Release Drafter, which keeps a draft GitHub release
+# continuously updated with notes from merged pull requests, so a release is
+# always ready to publish.
+# See: https://github.com/release-drafter/release-drafter
+#
+# The resolved version drives the draft's suggested name and tag. zarr-lint's
+# real version lives in Cargo.toml (see docs/versioning.md): when publishing,
+# bump the workspace version to match this draft's tag. The release workflows
+# verify that the tag and the Cargo version agree.
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+version-resolver:
+  major:
+    labels:
+      - 'release-major'
+  minor:
+    labels:
+      - 'release-minor'
+  patch:
+    labels:
+      - 'release-patch'
+  default: patch
+change-template: '- $TITLE (@$AUTHOR via #$NUMBER)'
+change-title-escapes: '\<*_&'
+template: |
+  ## Changes
+
+  $CHANGES

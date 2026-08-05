@@ -1,0 +1,30 @@
+---
+# Keeps a draft GitHub release up to date with notes from merged pull requests,
+# so there is always a release ready to publish.
+# See: https://github.com/release-drafter/release-drafter
+#
+# Publishing that draft (after bumping the Cargo workspace version to match the
+# draft's tag) fires `release: published`, which triggers release.yml (binaries)
+# and publish-pypi.yml (wheels).
+name: release drafter
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  draft_release:
+    permissions:
+      # Required to create and update the draft release.
+      contents: write
+      # Required for the autolabeler; read is enough without it.
+      pull-requests: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: release-drafter/release-drafter@v7.7.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

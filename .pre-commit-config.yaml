@@ -43,6 +43,14 @@ repos:
     hooks:
       - id: actionlint
 
+  # Static security analysis of the GitHub Actions workflows.
+  # `--offline` keeps it deterministic and token-free; config in .github/zizmor.yml.
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.29.0
+    hooks:
+      - id: zizmor
+        args: [--offline]
+
   # Local Rust hooks: authoritative, no network, and identical to CI.
   - repo: local
     hooks:

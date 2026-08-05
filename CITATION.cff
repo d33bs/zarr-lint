@@ -1,0 +1,25 @@
+# Citation File Format metadata: https://citation-file-format.github.io/
+# GitHub renders this as a "Cite this repository" option.
+# Note: no `version`/`date-released` is pinned here on purpose — the version has
+# a single source of truth (the Cargo workspace). See docs/versioning.md.
+cff-version: 1.2.0
+message: "If you use this software, please cite it using this metadata."
+title: zarr-lint
+abstract: >-
+  Inspect, validate, and understand Zarr stores with fast structural,
+  metadata, and compatibility checks. Built for scientific data and
+  reproducible workflows.
+type: software
+authors:
+  - family-names: Bunten
+    given-names: Dave
+repository-code: "https://github.com/d33bs/zarr-lint"
+url: "https://github.com/d33bs/zarr-lint"
+license: BSD-3-Clause
+keywords:
+  - zarr
+  - linter
+  - metadata
+  - validation
+  - scientific-data
+  - reproducibility

@@ -1,0 +1,39 @@
+# GitHub issue form for bug reports and ideas.
+name: Open an issue
+description: >
+  Report a bug, or suggest an idea or change that might be helpful.
+
+body:
+  - type: checkboxes
+    attributes:
+      label: Is this a duplicate?
+      description: >
+        Please search the existing issues first. If you find a related one,
+        please comment on it or add a reaction rather than opening a new issue.
+      options:
+        - label: I found no existing issue covering this topic.
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What is your bug report or idea?
+      description: >
+        Please describe the problem or idea, including context, what you
+        expected, and what actually happened. For bugs, include the zarr-lint
+        version (`zarr-lint --version`), the command you ran, and any relevant
+        output.
+      placeholder: >
+        For example: "Running `zarr-lint check store.zarr` reports X, but I
+        expected Y because ..."
+    validations:
+      required: true
+
+  - type: checkboxes
+    attributes:
+      label: Would you like to work on a solution?
+      description: >
+        This is optional and helps us understand your interest in contributing.
+        We are happy to guide you through the process — see CONTRIBUTING.md.
+      options:
+        - label: Yes, I am willing to submit a pull request for this!

@@ -1,0 +1,8 @@
+# Configuration for zizmor, a static analysis tool for GitHub Actions security.
+# https://docs.zizmor.sh/
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        # Require actions to be pinned to a ref (tag or branch), not floating.
+        "*": ref-pin
