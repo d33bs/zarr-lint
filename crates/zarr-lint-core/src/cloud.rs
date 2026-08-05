@@ -18,7 +18,7 @@ use object_store::aws::AmazonS3Builder;
 use object_store::azure::MicrosoftAzureBuilder;
 use object_store::gcp::GoogleCloudStorageBuilder;
 use object_store::path::Path as ObjectPath;
-use object_store::ObjectStore;
+use object_store::{ObjectStore, ObjectStoreExt};
 use url::Url;
 
 use crate::scanner::{MetadataRole, RawMetadataFile, ScanError, StoreOptions, StoreScan};
@@ -152,7 +152,7 @@ fn remote_error(url: &str, err: impl std::fmt::Display) -> ScanError {
 mod tests {
     use super::*;
     use object_store::memory::InMemory;
-    use object_store::PutPayload;
+    use object_store::{ObjectStoreExt, PutPayload};
 
     fn block_on<F: std::future::Future>(future: F) -> F::Output {
         tokio::runtime::Runtime::new().unwrap().block_on(future)

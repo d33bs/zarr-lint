@@ -106,7 +106,10 @@ pub fn lint_store_with(target: &str, options: &StoreOptions) -> Result<Report, L
 ///
 /// This supports inspection tooling that wants to enumerate the normalized
 /// nodes (see [`ZarrNode`]) discovered in a store.
-pub fn load_store(target: &str, options: &StoreOptions) -> Result<(StoreScan, LoadedStore), LintError> {
+pub fn load_store(
+    target: &str,
+    options: &StoreOptions,
+) -> Result<(StoreScan, LoadedStore), LintError> {
     let scan = scanner::scan_store(target, options)?;
     let loaded = model::load(&scan);
     Ok((scan, loaded))
