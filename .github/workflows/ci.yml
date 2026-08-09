@@ -112,7 +112,12 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install uv
-        uses: astral-sh/setup-uv@v9
+        # Pinned to an exact release: the `astral-sh/setup-uv` major-version
+        # tags `v8`/`v9` are currently broken upstream ("No commit found for the
+        # ref"), so `@v8`/`@v9` fail to resolve in Actions. `v9.0.0` is the
+        # latest release and resolves cleanly; pinning exact also keeps
+        # Dependabot from bumping back to a broken major tag.
+        uses: astral-sh/setup-uv@v9.0.0
       # Clippy the bindings crate (check-only, so it links nothing).
       - name: Clippy Python bindings
         run: cargo clippy -p zarr-lint-python --all-features -- -D warnings
