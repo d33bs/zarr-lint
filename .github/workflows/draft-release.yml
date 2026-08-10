@@ -3,9 +3,11 @@
 # so there is always a release ready to publish.
 # See: https://github.com/release-drafter/release-drafter
 #
-# Publishing that draft (after bumping the Cargo workspace version to match the
-# draft's tag) fires `release: published`, which triggers release.yml (binaries)
-# and publish-pypi.yml (wheels).
+# Publishing that draft fires `release: published`, which triggers release.yml
+# (binaries) and publish-pypi.yml (wheels). The release tag drives the version:
+# those workflows run `tools/sync_release_version.py` to rewrite the workspace
+# version to match the tag at build time, so no manual Cargo.toml bump is
+# required before publishing.
 name: release drafter
 
 on:
