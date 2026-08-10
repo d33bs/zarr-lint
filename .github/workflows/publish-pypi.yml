@@ -1,9 +1,11 @@
 ---
 # Build wheels + sdist and publish to PyPI when a GitHub release is published.
 #
-# The version is derived dynamically from the Cargo workspace version by
-# maturin; the `verify` job gates the whole run on the release tag agreeing with
-# that version.
+# The release tag drives the version: `tools/sync_release_version.py` rewrites
+# the Cargo workspace version to match the tag in each build checkout (an
+# ephemeral edit, never committed), and maturin derives the wheel version from
+# that synced Cargo version. The committed Cargo.toml version is only a
+# development placeholder and is not expected to track releases.
 #
 # Publishing uses PyPI Trusted Publishing (OIDC), so no API token is stored.
 # One-time setup on PyPI (done by a maintainer): add a trusted publisher for
@@ -24,7 +26,8 @@ env:
   RELEASE_TAG: ${{ github.event.release.tag_name }}
 
 jobs:
-  # Gate: the release tag must match the Cargo/pyproject version.
+  # Gate: validate the release tag and that the workspace version can be synced
+  # to it. The build jobs below repeat the sync in their own checkouts.
   verify:
     runs-on: ubuntu-24.04
     steps:
@@ -37,8 +40,9 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Verify tag matches the project version
-        run: python tools/check_versions.py --tag "$RELEASE_TAG"
+      - name: Sync version from release tag
+        shell: bash
+        run: python tools/sync_release_version.py "$RELEASE_TAG"
 
   wheels:
     needs: verify
@@ -62,6 +66,15 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Sync version from release tag
+        shell: bash
+        run: python tools/sync_release_version.py "$RELEASE_TAG"
       # abi3 (see the pyo3 crate) yields a single forward-compatible wheel per
       # platform for CPython 3.11+.
       - name: Build wheel
@@ -88,6 +101,15 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Sync version from release tag
+        shell: bash
+        run: python tools/sync_release_version.py "$RELEASE_TAG"
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:

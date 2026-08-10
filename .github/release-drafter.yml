@@ -4,10 +4,11 @@
 # always ready to publish.
 # See: https://github.com/release-drafter/release-drafter
 #
-# The resolved version drives the draft's suggested name and tag. zarr-lint's
-# real version lives in Cargo.toml (see docs/versioning.md): when publishing,
-# bump the workspace version to match this draft's tag. The release workflows
-# verify that the tag and the Cargo version agree.
+# The resolved version drives the draft's suggested name and tag. The committed
+# Cargo workspace version is only a development placeholder; the release
+# workflows run `tools/sync_release_version.py` to rewrite it to match the
+# draft's tag at build time, so no manual Cargo.toml bump is required before
+# publishing (see docs/versioning.md).
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 version-resolver:

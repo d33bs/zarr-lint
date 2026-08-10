@@ -56,8 +56,15 @@ Release tags use a `v` prefix; the package version omits it:
 | -------- | --------------- |
 | `v0.0.1` | `0.0.1`         |
 
-The release workflow refuses to publish if the tag and the workspace version
-disagree.
+The committed workspace version is a **development placeholder**; it is not
+expected to track the latest release. At release time the tag is the source of
+truth: [`tools/sync_release_version.py`](../tools/sync_release_version.py)
+rewrites the workspace version to match the tag inside each release build
+checkout (an ephemeral edit, never committed), so the published artifacts carry
+the tag's version. This mirrors the dynamic release versioning used by the
+sibling [`arrow-lint`][arrow-lint] project. Because the tag drives the version,
+publishing a draft release no longer requires a manual `Cargo.toml` bump
+beforehand.
 
 ## Development builds
 
@@ -76,8 +83,8 @@ is reported as `unknown`.
 
 ## Verifying consistency
 
-[`tools/check_versions.py`](../tools/check_versions.py) enforces the invariant.
-It is run in CI on every push and, with `--tag`, as a release gate.
+[`tools/check_versions.py`](../tools/check_versions.py) enforces the invariant
+during development. It is run in CI on every push.
 
 ```console
 $ python tools/check_versions.py
@@ -86,6 +93,13 @@ OK: version 0.0.1 is consistent across 3 crates, pyproject dynamic version, CLI.
 $ python tools/check_versions.py --tag v0.0.1
 OK: version 0.0.1 is consistent across 3 crates, pyproject dynamic version, CLI, tag v0.0.1.
 ```
+
+Its `--tag` mode checks that the committed version already equals a tag — useful
+for a manual pre-flight check, but it is **not** the release gate. The release
+workflows use [`tools/sync_release_version.py`](../tools/sync_release_version.py)
+to set the version from the tag at build time (see
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) and
+[`.github/workflows/publish-pypi.yml`](../.github/workflows/publish-pypi.yml)).
 
 It checks that:
 
@@ -118,8 +132,10 @@ $ python -c "import zarr_lint; print(zarr_lint.__version__)"
 0.0.1
 ```
 
-The release workflow publishes wheels and an sdist to PyPI on a GitHub release,
-gated on the tag matching the version (see
+The release workflow publishes wheels and an sdist to PyPI on a GitHub release.
+The release tag drives the version: `tools/sync_release_version.py` rewrites the
+workspace version to match the tag in each build checkout before maturin
+builds, so the published wheel version follows the tag (see
 [`.github/workflows/publish-pypi.yml`](../.github/workflows/publish-pypi.yml)).
 
 [arrow-lint]: https://github.com/d33bs/arrow-lint
