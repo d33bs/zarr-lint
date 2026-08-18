@@ -11,6 +11,7 @@
 //! ```text
 //! zarr-lint check path/to/store.zarr     # primary form
 //! zarr-lint path/to/store.zarr           # shorthand for `check`
+//! zarr-lint fmt path/to/store.zarr       # preview metadata formatting
 //! zarr-lint inspect path/to/store.zarr   # print a node summary
 //! zarr-lint version --verbose            # detailed version info
 //! zarr-lint --version                    # `zarr-lint 0.0.1`
@@ -23,7 +24,10 @@ use std::ffi::OsString;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use zarr_lint_core::model::format_dims;
-use zarr_lint_core::{lint_store_with, load_store, Report, Severity, StoreOptions};
+use zarr_lint_core::{
+    format_store, lint_store_with, load_store, plan_format_store, FormatPlan, Report, Severity,
+    StoreOptions,
+};
 
 const ABOUT: &str = "Inspect Zarr stores for structural and metadata problems.";
 
@@ -59,6 +63,8 @@ struct Cli {
 enum Command {
     /// Check a Zarr store for structural and metadata problems.
     Check(CheckArgs),
+    /// Format Zarr metadata without changing store semantics.
+    Fmt(FmtArgs),
     /// Print a summary of the groups and arrays discovered in a store.
     Inspect(InspectArgs),
     /// Print detailed version information.
@@ -95,6 +101,24 @@ struct InspectArgs {
     /// Access cloud object stores anonymously (no credentials or signing).
     #[arg(long)]
     anonymous: bool,
+}
+
+#[derive(Args, Clone)]
+struct FmtArgs {
+    /// Local filesystem path of the Zarr store to format.
+    path: String,
+
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = Format::Text)]
+    format: Format,
+
+    /// Fail if formatting is needed, but do not write files.
+    #[arg(long, conflicts_with = "write")]
+    check: bool,
+
+    /// Apply formatting changes.
+    #[arg(long)]
+    write: bool,
 }
 
 #[derive(Args, Clone)]
@@ -144,12 +168,69 @@ where
 
     match cli.command {
         Some(Command::Check(args)) => run_check(args),
+        Some(Command::Fmt(args)) => run_fmt(args),
         Some(Command::Inspect(args)) => run_inspect(args),
         Some(Command::Version(args)) => {
             print_version(args.verbose);
             exit::OK
         }
         None => run_check(cli.check),
+    }
+}
+
+fn run_fmt(args: FmtArgs) -> i32 {
+    if args.write {
+        let plan = match format_store(&args.path) {
+            Ok(plan) => plan,
+            Err(err) => {
+                eprintln!("error: {err}");
+                return exit::FAILURE;
+            }
+        };
+        match args.format {
+            Format::Text => {
+                if plan.is_empty() {
+                    println!("All metadata files are formatted.");
+                } else {
+                    println!("Formatted {} metadata file(s).", plan.changes.len());
+                    println!("Validated store after write.");
+                }
+            }
+            Format::Json => print_fmt_json(&args.path, "write", &plan),
+        }
+        return exit::OK;
+    }
+
+    let plan = match plan_format_store(&args.path) {
+        Ok(plan) => plan,
+        Err(err) => {
+            eprintln!("error: {err}");
+            return exit::FAILURE;
+        }
+    };
+
+    if args.check {
+        match args.format {
+            Format::Text => {
+                if plan.is_empty() {
+                    println!("All metadata files are formatted.");
+                } else {
+                    println!("{} metadata file(s) need formatting.", plan.changes.len());
+                }
+            }
+            Format::Json => print_fmt_json(&args.path, "check", &plan),
+        }
+        if plan.is_empty() {
+            exit::OK
+        } else {
+            exit::FINDINGS
+        }
+    } else if matches!(args.format, Format::Json) {
+        print_fmt_json(&args.path, "dry-run", &plan);
+        exit::OK
+    } else {
+        print_fmt_plan(&plan);
+        exit::OK
     }
 }
 
@@ -229,6 +310,40 @@ fn print_json(report: &Report) {
         Ok(json) => println!("{json}"),
         // Serializing a Report cannot realistically fail, but never panic on it.
         Err(err) => eprintln!("error: failed to serialize report: {err}"),
+    }
+}
+
+fn print_fmt_plan(plan: &FormatPlan) {
+    if plan.is_empty() {
+        println!("All metadata files are formatted.");
+        return;
+    }
+
+    println!("Would format {} metadata file(s):", plan.changes.len());
+    for change in &plan.changes {
+        println!("  {}", change.rel_display);
+    }
+    println!();
+    println!("No files were changed. Run with --write to apply.");
+}
+
+fn print_fmt_json(store: &str, mode: &str, plan: &FormatPlan) {
+    let changes: Vec<&str> = plan
+        .changes
+        .iter()
+        .map(|change| change.rel_display.as_str())
+        .collect();
+    let report = serde_json::json!({
+        "version": zarr_lint_core::VERSION,
+        "store": store,
+        "mode": mode,
+        "would_change": !plan.is_empty(),
+        "changed_count": plan.changes.len(),
+        "changes": changes,
+    });
+    match serde_json::to_string_pretty(&report) {
+        Ok(json) => println!("{json}"),
+        Err(err) => eprintln!("error: failed to serialize fmt report: {err}"),
     }
 }
 
