@@ -117,7 +117,7 @@ jobs:
         # ref"), so `@v8`/`@v9` fail to resolve in Actions. `v9.0.0` is the
         # latest release and resolves cleanly; pinning exact also keeps
         # Dependabot from bumping back to a broken major tag.
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.2.0
       # Clippy the bindings crate (check-only, so it links nothing).
       - name: Clippy Python bindings
         run: cargo clippy -p zarr-lint-python --all-features -- -D warnings
