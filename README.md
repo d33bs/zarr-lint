@@ -103,10 +103,10 @@ report matches the CLI's JSON schema:
 ```python
 import zarr_lint
 
-zarr_lint.__version__          # "0.0.1"
+zarr_lint.__version__  # "0.0.1"
 report = zarr_lint.lint("images.zarr")
-report["diagnostics"]          # list of {rule, severity, path, message, ...}
-zarr_lint.rules()              # the built-in rule registry
+report["diagnostics"]  # list of {rule, severity, path, message, ...}
+zarr_lint.rules()  # the built-in rule registry
 ```
 
 ## Rules
