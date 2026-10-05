@@ -2,7 +2,8 @@
 //! vendored fixtures. These exercise the full pipeline (discovery, parsing,
 //! rules, reporting, exit codes) exactly as a user would.
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 /// Run the built binary with `args` and return its output.
@@ -36,6 +37,12 @@ fn fixture(rel: &str) -> String {
         .join(rel)
         .to_string_lossy()
         .into_owned()
+}
+
+fn write(dir: &Path, rel: &str, contents: &str) {
+    let path = dir.join(rel);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, contents).unwrap();
 }
 
 const UPSTREAM: &str = "upstream/duckdb-zarr";
@@ -196,6 +203,108 @@ fn inspect_lists_nodes_from_both_versions() {
     let v3 = run(&["inspect", &fixture(&format!("{UPSTREAM}/simple_v3.zarr"))]);
     assert_eq!(code(&v3), 0);
     assert!(stdout(&v3).contains("v3 array"));
+}
+
+// ---- fmt ---------------------------------------------------------------
+
+#[test]
+fn fmt_dry_run_reports_changes_without_writing() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    write(tmp.path(), ".zgroup", "{\n  \"zarr_format\": 2\n}\n");
+    write(tmp.path(), ".zattrs", r#"{"b":2,"a":1}"#);
+
+    let out = run(&["fmt", tmp.path().to_str().unwrap()]);
+    assert_eq!(code(&out), 0, "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("Would format 1 metadata file"));
+    assert_eq!(
+        fs::read_to_string(tmp.path().join(".zattrs")).unwrap(),
+        r#"{"b":2,"a":1}"#
+    );
+}
+
+#[test]
+fn fmt_check_fails_when_formatting_is_needed() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    write(tmp.path(), ".zgroup", "{\n  \"zarr_format\": 2\n}\n");
+    write(tmp.path(), ".zattrs", r#"{"b":2,"a":1}"#);
+
+    let out = run(&["fmt", tmp.path().to_str().unwrap(), "--check"]);
+    assert_eq!(code(&out), 1, "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("1 metadata file"));
+}
+
+#[test]
+fn fmt_json_output_reports_changes() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    write(tmp.path(), ".zgroup", "{\n  \"zarr_format\": 2\n}\n");
+    write(tmp.path(), ".zattrs", r#"{"b":2,"a":1}"#);
+
+    let out = run(&[
+        "fmt",
+        tmp.path().to_str().unwrap(),
+        "--format",
+        "json",
+        "--check",
+    ]);
+    assert_eq!(code(&out), 1, "stderr: {}", stderr(&out));
+    let json: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(json["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(json["mode"], "check");
+    assert_eq!(json["would_change"], true);
+    assert_eq!(json["changed_count"], 1);
+    assert_eq!(json["changes"].as_array().unwrap()[0], ".zattrs");
+}
+
+#[test]
+fn fmt_write_formats_metadata_and_leaves_unrelated_json() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    write(tmp.path(), ".zgroup", "{\n  \"zarr_format\": 2\n}\n");
+    write(tmp.path(), ".zattrs", r#"{"b":[2,1],"a":{"d":4,"c":3}}"#);
+    write(tmp.path(), "app.json", r#"{"z":0,"a":1}"#);
+
+    let out = run(&["fmt", tmp.path().to_str().unwrap(), "--write"]);
+    assert_eq!(code(&out), 0, "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("Formatted 1 metadata file"));
+    assert_eq!(
+        fs::read_to_string(tmp.path().join(".zattrs")).unwrap(),
+        "{\n  \"a\": {\n    \"c\": 3,\n    \"d\": 4\n  },\n  \"b\": [\n    2,\n    1\n  ]\n}\n"
+    );
+    assert_eq!(
+        fs::read_to_string(tmp.path().join("app.json")).unwrap(),
+        r#"{"z":0,"a":1}"#
+    );
+
+    let check = run(&["fmt", tmp.path().to_str().unwrap(), "--check"]);
+    assert_eq!(code(&check), 0, "stderr: {}", stderr(&check));
+}
+
+#[test]
+fn fmt_formats_consolidated_metadata_from_cli() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    write(
+        tmp.path(),
+        ".zmetadata",
+        r#"{"metadata":{".zgroup":{"zarr_format":2}},"zarr_consolidated_format":1}"#,
+    );
+
+    let out = run(&["fmt", tmp.path().to_str().unwrap(), "--write"]);
+    assert_eq!(code(&out), 0, "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("Formatted 1 metadata file"));
+    assert_eq!(
+        fs::read_to_string(tmp.path().join(".zmetadata")).unwrap(),
+        "{\n  \"metadata\": {\n    \".zgroup\": {\n      \"zarr_format\": 2\n    }\n  },\n  \"zarr_consolidated_format\": 1\n}\n"
+    );
+}
+
+#[test]
+fn fmt_refuses_invalid_metadata() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    write(tmp.path(), ".zgroup", r#"{"zarr_format":2}"#);
+    write(tmp.path(), ".zattrs", "{bad");
+
+    let out = run(&["fmt", tmp.path().to_str().unwrap()]);
+    assert_eq!(code(&out), 3);
+    assert!(stderr(&out).contains("cannot format invalid JSON"));
 }
 
 // ---- ecosystem: no false positives -------------------------------------

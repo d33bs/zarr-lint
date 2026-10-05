@@ -48,6 +48,7 @@ cargo build --release
 ```text
 zarr-lint check <PATH>     Check a store (primary form)
 zarr-lint <PATH>           Shorthand for `check`
+zarr-lint fmt <PATH>       Preview safe metadata formatting changes
 zarr-lint inspect <PATH>   Print a summary of discovered groups and arrays
 zarr-lint version          Print version (add --verbose for commit/profile)
 ```
@@ -59,6 +60,14 @@ Options for `check`:
 --fail-on warning|error|never
                            Severity at/above which findings fail (default: error)
 --quiet                    Suppress the summary/success line (text output)
+```
+
+Options for `fmt`:
+
+```text
+--format text|json         Output format (default: text)
+--check                    Fail if formatting is needed, without writing files
+--write                    Apply formatting changes
 ```
 
 ### Examples
@@ -75,6 +84,18 @@ zarr-lint check --fail-on never path/to/store.zarr
 
 # See what the linter discovered
 zarr-lint inspect path/to/store.zarr
+
+# Preview metadata formatting changes
+zarr-lint fmt path/to/store.zarr
+
+# Fail if metadata formatting is needed
+zarr-lint fmt path/to/store.zarr --check
+
+# Apply metadata formatting changes
+zarr-lint fmt path/to/store.zarr --write
+
+# Emit a machine-readable formatting report
+zarr-lint fmt path/to/store.zarr --format json
 ```
 
 JSON output:
@@ -141,6 +162,12 @@ problems. It inspects metadata rather than reading or decoding chunk data, which
 keeps checks fast and lightweight. Coverage grows with each release; see the
 [rules](docs/rules.md).
 
+`zarr-lint fmt` formats local metadata documents only. It canonicalizes JSON
+representation details such as whitespace and object-key order. It does not
+rewrite chunks, change codecs, migrate versions, repair metadata, or change the
+meaning of the store. The command is a dry run by default; pass `--write` to
+modify files. See [docs/fmt.md](docs/fmt.md).
+
 Stores can be **local** (a filesystem path) or **remote** over `http(s)://`,
 including public object stores reached through their HTTPS endpoints. Because
 HTTP has no directory listing, remote discovery uses the store's consolidated
@@ -176,6 +203,7 @@ uv run --with zarr --with xarray --with tensorstore tools/generate_fixtures.py
 Documentation:
 
 - [docs/architecture.md](docs/architecture.md) — pipeline, crates, and model.
+- [docs/fmt.md](docs/fmt.md) — safe metadata formatting.
 - [docs/rules.md](docs/rules.md) — the rule set and fixtures.
 - [docs/versioning.md](docs/versioning.md) — the dynamic versioning model.
 - [docs/test-corpus.md](docs/test-corpus.md) — fixture provenance.

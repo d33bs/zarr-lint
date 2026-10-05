@@ -15,6 +15,7 @@
 
 mod cloud;
 pub mod diagnostic;
+pub mod format;
 pub mod model;
 mod remote;
 pub mod rule;
@@ -23,6 +24,7 @@ pub mod scanner;
 use serde::Serialize;
 
 pub use diagnostic::{Diagnostic, Severity};
+pub use format::{format_store, format_store_check, plan_format_store, FormatChange, FormatPlan};
 pub use model::{LoadedStore, NodeKind, ParsedMetadata, ZarrNode, ZarrVersion};
 pub use rule::{RuleInfo, RULES};
 pub use scanner::{ScanError, StoreOptions, StoreScan};
@@ -124,7 +126,7 @@ mod tests {
     #[test]
     fn version_is_populated_from_cargo() {
         assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
-        assert!(!VERSION.is_empty());
+        assert!(VERSION.chars().any(|c| c.is_ascii_digit()));
     }
 
     #[test]
