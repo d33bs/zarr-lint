@@ -249,7 +249,7 @@ fn sort_objects(value: &Value) -> Value {
     match value {
         Value::Object(object) => {
             let mut entries: Vec<_> = object.iter().collect();
-            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+            entries.sort_by_key(|(key, _)| *key);
             let mut sorted = Map::new();
             for (key, value) in entries {
                 sorted.insert(key.clone(), sort_objects(value));
