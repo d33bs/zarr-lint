@@ -6,8 +6,9 @@ zarr-lint keeps a single authoritative version in the root ``Cargo.toml``
 ``version.workspace = true``. That field is a *development placeholder* — it is
 not expected to track the latest release. At release time the release tag (for
 example ``v0.0.2``) is the source of truth: this script rewrites the workspace
-``version`` to match the tag in the CI checkout, regenerates the lockfile, and
-verifies a representative publishable crate reports that version. Nothing is
+``version`` and internal dependency pins to match the tag in the CI checkout,
+updates workspace lockfile entries, and verifies the Python bindings crate
+reports that version. Nothing is
 committed; the rewrite lives only in the ephemeral build checkout so the
 published artifacts carry the tag version while the repository keeps its
 development placeholder.
@@ -27,6 +28,7 @@ import argparse
 import json
 import re
 import subprocess
+import tomllib
 from pathlib import Path
 
 # The first standalone `version = "x.y.z"` line in the root Cargo.toml, which is
@@ -35,7 +37,7 @@ from pathlib import Path
 VERSION_PATTERN = re.compile(r'^version = "\d+\.\d+\.\d+(?:[-+][^"]+)?"$', re.MULTILINE)
 TAG_PATTERN = re.compile(r"^v?(?P<version>\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)$")
 
-# A publishable workspace crate used to confirm the inherited version took hold.
+# The Python bindings crate confirms the version maturin uses for PyPI.
 REPRESENTATIVE_PACKAGE = "zarr-lint-python"
 
 
@@ -56,7 +58,14 @@ def main() -> int:
     if current_text == next_text and f'version = "{version}"' not in current_text:
         raise SystemExit("could not find workspace package version in Cargo.toml")
 
+    manifests = release_manifest_edits(version)
+
     if args.check:
+        for path, text in manifests.items():
+            if path.read_text() != text:
+                raise SystemExit(
+                    f"release version or dependency requirement differs in {path}"
+                )
         package_version = cargo_package_version(REPRESENTATIVE_PACKAGE)
         if package_version != version:
             raise_version_mismatch(args.tag, package_version)
@@ -64,7 +73,10 @@ def main() -> int:
         return 0
 
     cargo_toml.write_text(next_text)
-    subprocess.run(["cargo", "generate-lockfile"], check=True)
+    for path, text in manifests.items():
+        path.write_text(text)
+    # Update workspace versions without upgrading unrelated dependencies.
+    subprocess.run(["cargo", "update", "--workspace"], check=True)
     package_version = cargo_package_version(REPRESENTATIVE_PACKAGE)
     if package_version != version:
         raise_version_mismatch(args.tag, package_version)
@@ -72,8 +84,41 @@ def main() -> int:
     return 0
 
 
+def release_manifest_edits(version: str) -> dict[Path, str]:
+    """Plan exact internal dependency pins before modifying any manifests."""
+    workspace = tomllib.loads(Path("Cargo.toml").read_text())["workspace"]
+    manifests = [Path(member) / "Cargo.toml" for member in workspace["members"]]
+    names = {tomllib.loads(path.read_text())["package"]["name"] for path in manifests}
+    edits = {}
+    for path in manifests:
+        text = path.read_text()
+        data = tomllib.loads(text)
+        for name, dependency in data.get("dependencies", {}).items():
+            if (
+                name not in names
+                or not isinstance(dependency, dict)
+                or "path" not in dependency
+            ):
+                continue
+            if "version" not in dependency:
+                raise SystemExit(
+                    f"internal dependency {name} in {path} needs a version"
+                )
+            pattern = re.compile(
+                rf'(^\s*{re.escape(name)}\s*=\s*\{{[^\n]*?\bversion\s*=\s*)"[^"]+"',
+                re.MULTILINE,
+            )
+            text, count = pattern.subn(
+                lambda match: f'{match.group(1)}"={version}"', text
+            )
+            if count != 1:
+                raise SystemExit(f"could not rewrite dependency {name} in {path}")
+        edits[path] = text
+    return edits
+
+
 def version_from_tag(tag: str) -> str:
-    match = TAG_PATTERN.match(tag)
+    match = TAG_PATTERN.fullmatch(tag)
     if not match:
         raise SystemExit(f"release tag must look like v1.2.3: {tag}")
     return match.group("version")

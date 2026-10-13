@@ -6,14 +6,16 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+# Distributed as a Python extension through PyPI, not as a Rust library.
+publish = false
 
 [lib]
 name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-zarr-lint-core = { path = "../zarr-lint-core" }
-zarr-lint-cli = { path = "../zarr-lint-cli" }
+zarr-lint-core = { path = "../zarr-lint-core", version = "=0.0.1" }
+zarr-lint-cli = { path = "../zarr-lint-cli", version = "=0.0.1" }
 serde_json.workspace = true
 # `abi3-py311` builds a single forward-compatible wheel for CPython 3.11+.
 pyo3 = { workspace = true, features = ["extension-module", "abi3-py311"] }

@@ -85,7 +85,7 @@ def check_pyproject_dynamic_version() -> None:
 
 
 def version_from_tag(tag: str) -> str:
-    match = TAG_PATTERN.match(tag)
+    match = TAG_PATTERN.fullmatch(tag)
     if not match:
         raise SystemExit(f"release tag must look like v1.2.3: {tag}")
     return match.group("version")
@@ -101,7 +101,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    versions = workspace_versions(cargo_metadata())
+    metadata = cargo_metadata()
+    versions = workspace_versions(metadata)
     if not versions:
         raise SystemExit("no workspace crates found in cargo metadata")
 
@@ -115,6 +116,17 @@ def main() -> int:
     missing = PUBLISHABLE - set(versions)
     if missing:
         raise SystemExit(f"missing expected publishable crates: {sorted(missing)}")
+
+    for package in metadata["packages"]:
+        if package["name"] not in versions:
+            continue
+        for dependency in package["dependencies"]:
+            if dependency["name"] in versions and dependency.get("path"):
+                expected = f"={versions[dependency['name']]}"
+                if dependency["req"] != expected:
+                    raise SystemExit(
+                        f"{package['name']} dependency {dependency['name']} must use {expected}"
+                    )
 
     check_pyproject_dynamic_version()
     checked = [f"{len(versions)} crates", "pyproject dynamic version"]
