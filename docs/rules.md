@@ -3,7 +3,7 @@
 Each rule has a stable identifier, a documented default severity, and both a
 positive fixture (which triggers it) and a negative fixture (which does not). The
 registry lives in
-[`crates/zarr-lint-core/src/rule.rs`](../crates/zarr-lint-core/src/rule.rs).
+[`crates/zarr-lint/src/rule.rs`](../crates/zarr-lint/src/rule.rs).
 
 Every rule defaults to **error** severity. The `--fail-on` flag selects the
 severity at or above which findings cause a non-zero exit (`error` by default;
@@ -34,7 +34,7 @@ negative fixtures are the valid upstream stores under
 | `array/rank-mismatch`                 | `invalid/rank-mismatch.zarr`              | `.../simple_v3.zarr`     |
 
 The mapping is asserted end to end by
-[`each_invalid_fixture_triggers_its_rule`](../crates/zarr-lint-cli/tests/cli.rs).
+[`each_invalid_fixture_triggers_its_rule`](../crates/zarr-lint/tests/cli.rs).
 
 ## Rule details
 

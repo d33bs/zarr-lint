@@ -47,7 +47,7 @@ uv run pytest
 
 ## Adding a rule
 
-Each rule lives in [`crates/zarr-lint-core/src/rule.rs`](crates/zarr-lint-core/src/rule.rs)
+Each rule lives in [`crates/zarr-lint/src/rule.rs`](crates/zarr-lint/src/rule.rs)
 and needs a stable identifier, a documented default severity, and **both** a
 fixture that triggers it and one that does not. See
 [docs/rules.md](docs/rules.md) and [docs/test-corpus.md](docs/test-corpus.md).

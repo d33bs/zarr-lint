@@ -91,6 +91,25 @@ jobs:
         env:
           SKIP: cargo-fmt,cargo-clippy
 
+  # Exercise publishable archives on PRs, without credentials or uploads.
+  cargo-packages:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Exercise tag-driven release packaging
+        run: |
+          python tools/sync_release_version.py v1.2.3
+          python tools/check_versions.py --tag v1.2.3
+          cargo publish --dry-run --allow-dirty --locked -p zarr-lint
+
   # Build the pyo3 extension and exercise the Python package end to end.
   python:
     strategy:
