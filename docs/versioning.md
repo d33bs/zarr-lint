@@ -18,7 +18,7 @@ Every crate inherits it rather than declaring its own:
 
 ```toml
 [package]
-name = "zarr-lint-core"
+name = "zarr-lint"
 version.workspace = true
 ```
 
@@ -26,7 +26,7 @@ The CLI reads it from Cargo at compile time; it is never written into Rust
 source:
 
 ```rust
-// crates/zarr-lint-core/src/lib.rs
+// crates/zarr-lint/src/lib.rs
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 ```
 
@@ -88,10 +88,10 @@ during development. It is run in CI on every push.
 
 ```console
 $ python tools/check_versions.py
-OK: version 0.0.1 is consistent across 3 crates, pyproject dynamic version, CLI.
+OK: version 0.0.1 is consistent across 2 crates, pyproject dynamic version, CLI.
 
 $ python tools/check_versions.py --tag v0.0.1
-OK: version 0.0.1 is consistent across 3 crates, pyproject dynamic version, CLI, tag v0.0.1.
+OK: version 0.0.1 is consistent across 2 crates, pyproject dynamic version, CLI, tag v0.0.1.
 ```
 
 Its `--tag` mode checks that the committed version already equals a tag — useful
@@ -146,26 +146,27 @@ It uses the same tag and version-sync script as PyPI and the binary builds:
 
 1. Check out the release tag, not the current development branch.
 2. Set the workspace version and every internal dependency pin from the tag.
-3. Verify all three crate versions and the CLI against that tag.
-4. Build and verify the Cargo archives with `cargo publish --dry-run`.
-5. Authenticate and publish `zarr-lint-core`, then `zarr-lint-cli`.
+3. Verify the public crate, private Python bindings, and CLI against that tag.
+4. Build and verify the Cargo archive with `cargo publish --dry-run`.
+5. Authenticate and publish the single `zarr-lint` crate.
 
 The Python bindings crate has `publish = false`: it is distributed through
 PyPI, but still inherits the same workspace version. For a stable release such
-as `v1.2.3`, both Rust crates, the CLI binary, and the Python distribution all
+as `v1.2.3`, the Rust crate, CLI binary, and Python distribution all
 report `1.2.3`. Pre-release version spelling may be normalized by Python
 packaging (for example, `1.2.3-rc.1` becomes `1.2.3rc1`).
 
-Internal Rust dependencies include exact version requirements as well as local
-paths. The release sync updates these requirements automatically, so a released
-CLI cannot accidentally depend on a different core release. The sync updates
+The private Python bindings depend on `zarr-lint` through a local path and an
+exact version requirement. The release sync updates that requirement automatically.
+The library and CLI are built from the same public crate, so no separate core
+package needs to be published. The sync updates
 workspace entries in `Cargo.lock` without deliberately upgrading third-party
 dependencies. The committed manifests keep their development placeholders.
 
 ### One-time registry setup
 
 Create a GitHub environment named `crates-io`, with any desired release
-approval rules. Configure a crates.io trusted publisher on each Rust crate:
+approval rules. Configure one crates.io trusted publisher on `zarr-lint`:
 
 - Repository owner: `d33bs`
 - Repository: `zarr-lint`
@@ -174,14 +175,14 @@ approval rules. Configure a crates.io trusted publisher on each Rust crate:
 
 The workflow uses short-lived OIDC credentials through
 [`rust-lang/crates-io-auth-action`](https://github.com/rust-lang/crates-io-auth-action).
-If the crate names have not been published yet, bootstrap the first release
+If `zarr-lint` has not been published yet, bootstrap the first release
 with a crates.io API token stored as the `CRATES_IO_TOKEN` secret in the
 `crates-io` environment. The workflow uses that token when present. After the
-first publication, configure both trusted publishers and delete the secret;
+first publication, configure its trusted publisher and delete the secret;
 subsequent releases use OIDC without a stored token.
 
-Publishing is not atomic across crates.io and PyPI (or between individual Rust
-crates). A registry failure can leave a partial release; inspect the published
+Publishing is not atomic across crates.io and PyPI. A registry failure can leave
+a release available on only one registry; inspect the published
 versions before retrying. Crates.io versions cannot be overwritten. No registry
 configuration, token creation, or publication happens when running local tests.
 
@@ -192,11 +193,11 @@ Run the version sync only in a disposable checkout when testing a release:
 ```bash
 python tools/sync_release_version.py v1.2.3
 python tools/check_versions.py --tag v1.2.3
-cargo publish --dry-run --allow-dirty --locked -p zarr-lint-core -p zarr-lint-cli
+cargo publish --dry-run --allow-dirty --locked -p zarr-lint
 ```
 
 `--allow-dirty` permits the intentional, uncommitted release-version rewrite.
-The dry run builds both archives but uploads neither. CI exercises this same
+The dry run builds the archive but does not upload it. CI exercises this same
 path on pull requests; the real publish job runs only for a published GitHub
 release.
 

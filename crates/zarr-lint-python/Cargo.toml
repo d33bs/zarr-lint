@@ -14,8 +14,7 @@ name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-zarr-lint-core = { path = "../zarr-lint-core", version = "=0.0.1" }
-zarr-lint-cli = { path = "../zarr-lint-cli", version = "=0.0.1" }
+zarr-lint = { path = "../zarr-lint", version = "=0.0.1" }
 serde_json.workspace = true
 # `abi3-py311` builds a single forward-compatible wheel for CPython 3.11+.
 pyo3 = { workspace = true, features = ["extension-module", "abi3-py311"] }

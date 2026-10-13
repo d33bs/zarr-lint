@@ -29,7 +29,7 @@ import tomllib
 from pathlib import Path
 
 # Crates that are part of the public release surface and must share the version.
-PUBLISHABLE = {"zarr-lint-core", "zarr-lint-cli", "zarr-lint-python"}
+EXPECTED_PACKAGES = {"zarr-lint", "zarr-lint-python"}
 
 # Accepts tags like ``v0.0.1`` or ``0.0.1`` with an optional pre-release/build
 # suffix, mirroring the pattern used by the sibling arrow-lint project.
@@ -55,7 +55,7 @@ def workspace_versions(metadata: dict) -> dict[str, str]:
 
 def cli_reported_version() -> str:
     output = subprocess.check_output(
-        ["cargo", "run", "--quiet", "--package", "zarr-lint-cli", "--", "--version"],
+        ["cargo", "run", "--quiet", "--package", "zarr-lint", "--", "--version"],
         text=True,
     ).strip()
     parts = output.split()
@@ -113,9 +113,9 @@ def main() -> int:
         raise SystemExit("workspace crates have differing versions")
     version = distinct.pop()
 
-    missing = PUBLISHABLE - set(versions)
+    missing = EXPECTED_PACKAGES - set(versions)
     if missing:
-        raise SystemExit(f"missing expected publishable crates: {sorted(missing)}")
+        raise SystemExit(f"missing expected workspace crates: {sorted(missing)}")
 
     for package in metadata["packages"]:
         if package["name"] not in versions:

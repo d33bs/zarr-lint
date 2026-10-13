@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import runpy
 import shutil
+import subprocess
+import json
 import sys
 import tomllib
 from pathlib import Path
@@ -12,6 +14,30 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 SYNC = runpy.run_path(str(ROOT / "tools" / "sync_release_version.py"))
+
+
+def test_one_public_crate_provides_library_and_binary() -> None:
+    metadata = json.loads(
+        subprocess.check_output(
+            ["cargo", "metadata", "--no-deps", "--format-version", "1"],
+            cwd=ROOT,
+            text=True,
+        )
+    )
+    packages = {package["name"]: package for package in metadata["packages"]}
+    public = {name for name, package in packages.items() if package["publish"] != []}
+    assert public == {"zarr-lint"}
+    assert set(packages) == {"zarr-lint", "zarr-lint-python"}
+    targets = {
+        (target["name"], tuple(target["kind"]))
+        for target in packages["zarr-lint"]["targets"]
+    }
+    assert ("zarr_lint", ("lib",)) in targets
+    assert ("zarr-lint", ("bin",)) in targets
+    assert metadata["workspace_default_members"] == [packages["zarr-lint"]["id"]]
+    dependencies = packages["zarr-lint-python"]["dependencies"]
+    assert [dep["name"] for dep in dependencies if dep.get("path")] == ["zarr-lint"]
+    assert all(dep["name"] != "pyo3" for dep in packages["zarr-lint"]["dependencies"])
 
 
 @pytest.fixture
@@ -33,6 +59,17 @@ def test_invalid_tag(tag: str) -> None:
         SYNC["version_from_tag"](tag)
 
 
+def test_release_rejects_literal_package_versions(checkout: Path) -> None:
+    path = checkout / "crates" / "zarr-lint-python" / "Cargo.toml"
+    path.write_text(
+        path.read_text().replace(
+            "\nversion.workspace = true\n", '\nversion = "0.0.1"\n'
+        )
+    )
+    with pytest.raises(SystemExit, match="inherit the workspace version"):
+        SYNC["release_manifest_edits"]("1.2.3")
+
+
 def test_release_pins_every_internal_dependency(checkout: Path) -> None:
     edits = SYNC["release_manifest_edits"]("1.2.3")
     dependencies = []
@@ -43,12 +80,12 @@ def test_release_pins_every_internal_dependency(checkout: Path) -> None:
                 assert dependency["version"] == "=1.2.3"
                 dependencies.append(name)
         # Planning must not write to the checkout.
-        assert path.read_text() != text or data["package"]["name"] == "zarr-lint-core"
-    assert sorted(dependencies) == ["zarr-lint-cli", "zarr-lint-core", "zarr-lint-core"]
+        assert path.read_text() != text or data["package"]["name"] == "zarr-lint"
+    assert dependencies == ["zarr-lint"]
 
 
 def test_missing_dependency_version_fails_before_writing(checkout: Path) -> None:
-    path = checkout / "crates" / "zarr-lint-cli" / "Cargo.toml"
+    path = checkout / "crates" / "zarr-lint-python" / "Cargo.toml"
     path.write_text(path.read_text().replace(', version = "=0.0.1"', ""))
     original = (checkout / "Cargo.toml").read_text()
     with pytest.raises(SystemExit, match="needs a version"):
@@ -60,7 +97,7 @@ def test_check_detects_dependency_drift(
     checkout: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(sys, "argv", ["sync_release_version.py", "v0.0.1", "--check"])
-    path = checkout / "crates" / "zarr-lint-cli" / "Cargo.toml"
+    path = checkout / "crates" / "zarr-lint-python" / "Cargo.toml"
     path.write_text(
         path.read_text().replace('version = "=0.0.1"', 'version = "=0.0.2"')
     )

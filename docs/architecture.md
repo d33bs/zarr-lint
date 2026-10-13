@@ -20,29 +20,28 @@ Report
 ```
 
 The single public entry point is
-[`zarr_lint_core::lint_store`](../crates/zarr-lint-core/src/lib.rs), which
+[`zarr_lint::lint_store`](../crates/zarr-lint/src/lib.rs), which
 returns a serializable [`Report`].
 
 ## Crates
 
-The core linting engine lives in two crates; a thin third crate provides the
-Python bindings. Additional store and rule-pack crates can be extracted later
+The Rust library and CLI are one public crate, `zarr-lint`. A thin, private
+crate provides Python bindings. Additional crates can be extracted later only
 when real implementation pressure justifies them.
 
-| Crate              | Responsibility                                            |
+| Crate              | Responsibility                                           |
 | ------------------ | -------------------------------------------------------- |
-| `zarr-lint-core`   | Discovery, parsing, the normalized model, and the rules. |
-| `zarr-lint-cli`    | The CLI, exposed as a library (`run`) plus a thin binary. |
-| `zarr-lint-python` | pyo3 bindings: a `_native` module wrapping the above.     |
+| `zarr-lint`        | Discovery, parsing, rules, formatting, and the CLI binary. |
+| `zarr-lint-python` | Private pyo3 bindings: a `_native` module wrapping the library. |
 
-The CLI logic lives in the `zarr-lint-cli` **library**, so the native binary and
-the Python console script (`zarr-lint`) run byte-for-byte the same code — the
-Python entry point simply calls `zarr_lint_cli::run` through pyo3. The bindings
-crate is a pyo3 extension module (`crate-type = ["cdylib"]`, `abi3-py311`) and is
-built with maturin; it is excluded from the Cargo `default-members` because a
-plain `cargo build` cannot link an extension module.
+The CLI logic lives in the public library's `cli` module, so the native binary
+and the Python console script (`zarr-lint`) run the same code. The Python entry
+point calls `zarr_lint::cli::run` through pyo3. The bindings crate has
+`publish = false` and is a pyo3 extension module
+(`crate-type = ["cdylib"]`, `abi3-py311`) built with maturin. It is excluded from
+Cargo `default-members`, so ordinary Cargo builds do not need Python.
 
-### `zarr-lint-core` modules
+### `zarr-lint` modules
 
 - `scanner` — discovers recognized metadata documents (`.zgroup`, `.zarray`,
   `zarr.json`) and dispatches on the target: a local path is walked with
@@ -116,5 +115,5 @@ it is not a full Zarr specification validator. It runs a focused, dependable rul
 set, and broader capabilities — remote object stores, codec validation, and
 domain-specific profiles such as OME-Zarr and Xarray — build on this same core.
 
-[`Report`]: ../crates/zarr-lint-core/src/lib.rs
-[`ZarrNode`]: ../crates/zarr-lint-core/src/model.rs
+[`Report`]: ../crates/zarr-lint/src/lib.rs
+[`ZarrNode`]: ../crates/zarr-lint/src/model.rs

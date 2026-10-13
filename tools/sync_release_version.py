@@ -93,6 +93,8 @@ def release_manifest_edits(version: str) -> dict[Path, str]:
     for path in manifests:
         text = path.read_text()
         data = tomllib.loads(text)
+        if data["package"].get("version") != {"workspace": True}:
+            raise SystemExit(f"package in {path} must inherit the workspace version")
         for name, dependency in data.get("dependencies", {}).items():
             if (
                 name not in names

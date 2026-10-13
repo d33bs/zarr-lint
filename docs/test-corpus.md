@@ -112,7 +112,7 @@ To validate the experience against metadata written by tools people actually
 use — not just one source — `test-data/generated/` holds small, **valid** stores
 produced directly by popular Zarr writers. They are the "no false positives"
 corpus: zarr-lint must report nothing for any of them. This is asserted by
-[`real_ecosystem_stores_have_no_findings`](../crates/zarr-lint-cli/tests/cli.rs).
+[`real_ecosystem_stores_have_no_findings`](../crates/zarr-lint/tests/cli.rs).
 
 Regenerate with:
 

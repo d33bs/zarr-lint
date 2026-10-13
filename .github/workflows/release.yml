@@ -61,7 +61,7 @@ jobs:
         shell: bash
         run: python tools/sync_release_version.py "${RELEASE_TAG}"
       - name: cargo install from a clean checkout
-        run: cargo install --path crates/zarr-lint-cli --root "$RUNNER_TEMP/zli"
+        run: cargo install --path crates/zarr-lint --root "$RUNNER_TEMP/zli"
       - name: Installed binary reports the tag version
         run: |
           got="$("$RUNNER_TEMP/zli/bin/zarr-lint" --version)"
@@ -108,7 +108,7 @@ jobs:
       # Caching is intentionally omitted from release-artifact builds to avoid
       # cache-poisoning of published binaries.
       - name: Build release binary
-        run: cargo build --release --package zarr-lint-cli --target ${{ matrix.target }}
+        run: cargo build --release --package zarr-lint --target ${{ matrix.target }}
 
       - name: Package (Unix)
         if: matrix.archive == 'tar.gz'
