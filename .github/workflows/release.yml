@@ -23,7 +23,7 @@ jobs:
   # Gate: validate the release tag and that the workspace version can be synced
   # to it. The build jobs below repeat the sync in their own checkouts.
   verify:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -45,7 +45,7 @@ jobs:
   # Confirm the project installs cleanly from a fresh checkout.
   install-test:
     needs: verify
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -74,18 +74,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-26.04
             target: x86_64-unknown-linux-gnu
             archive: tar.gz
-          - os: macos-14
+          - os: macos-26
             target: aarch64-apple-darwin
             archive: tar.gz
           # GitHub retired the macos-13 (Intel) runner, so build the x86_64
           # macOS binary by cross-compiling on Apple Silicon.
-          - os: macos-14
+          - os: macos-26
             target: x86_64-apple-darwin
             archive: tar.gz
-          - os: windows-latest
+          - os: windows-2025
             target: x86_64-pc-windows-msvc
             archive: zip
     runs-on: ${{ matrix.os }}
@@ -136,7 +136,7 @@ jobs:
 
   release:
     needs: [verify, install-test, build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
