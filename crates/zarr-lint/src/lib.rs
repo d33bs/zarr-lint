@@ -13,6 +13,7 @@
 //! chunk data or claims full Zarr specification conformance; see the project
 //! documentation for the (deliberately small) scope of the initial rule set.
 
+pub mod cli;
 mod cloud;
 pub mod diagnostic;
 pub mod format;

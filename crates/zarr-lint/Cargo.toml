@@ -1,13 +1,18 @@
 [package]
-name = "zarr-lint-core"
-description = "Store discovery, metadata model, and rule engine for zarr-lint."
+name = "zarr-lint"
+description = "Inspect and format Zarr stores with a Rust library and command line interface."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[[bin]]
+name = "zarr-lint"
+path = "src/main.rs"
+
 [dependencies]
+clap.workspace = true
 futures.workspace = true
 object_store.workspace = true
 serde.workspace = true

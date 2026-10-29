@@ -1,0 +1,76 @@
+---
+# Publish Rust crates from the same release tag used by PyPI and binary builds.
+# Configure a crates.io trusted publisher for zarr-lint with this workflow and
+# the `crates-io` environment. See docs/versioning.md for first-release setup.
+name: publish crates
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-crates-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RELEASE_TAG: ${{ github.event.release.tag_name }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Sync and verify release versions
+        run: |
+          python tools/sync_release_version.py "$RELEASE_TAG"
+          python tools/check_versions.py --tag "$RELEASE_TAG"
+      - name: Verify the crate without uploading
+        # The version sync intentionally changes the release checkout.
+        run: cargo publish --dry-run --allow-dirty --locked -p zarr-lint
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: crates-io
+    # Only needed for the first publication; remove the secret after setup.
+    env:
+      BOOTSTRAP_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Sync and verify release versions
+        run: |
+          python tools/sync_release_version.py "$RELEASE_TAG"
+          python tools/check_versions.py --tag "$RELEASE_TAG" --skip-cli
+      - name: Authenticate with crates.io
+        if: env.BOOTSTRAP_TOKEN == ''
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+      - name: Publish zarr-lint
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || env.BOOTSTRAP_TOKEN }}
+        run: cargo publish --allow-dirty --locked -p zarr-lint

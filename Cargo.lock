@@ -2342,19 +2342,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "zarr-lint-cli"
+name = "zarr-lint"
 version = "0.0.1"
 dependencies = [
  "clap",
- "serde_json",
- "tempfile",
- "zarr-lint-core",
-]
-
-[[package]]
-name = "zarr-lint-core"
-version = "0.0.1"
-dependencies = [
  "futures",
  "object_store",
  "serde",
@@ -2374,8 +2365,7 @@ version = "0.0.1"
 dependencies = [
  "pyo3",
  "serde_json",
- "zarr-lint-cli",
- "zarr-lint-core",
+ "zarr-lint",
 ]
 
 [[package]]

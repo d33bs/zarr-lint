@@ -30,10 +30,13 @@ From PyPI (installs the `zarr-lint` command and a Python API):
 pip install zarr-lint
 ```
 
+After the first crates.io release, install the Rust CLI with `cargo install zarr-lint`.
+The same crate also exposes the Rust library as `zarr_lint`.
+
 From source with Cargo (requires Rust 1.82+):
 
 ```bash
-cargo install --path crates/zarr-lint-cli
+cargo install --path crates/zarr-lint
 ```
 
 Or build the binary in-tree:
@@ -185,7 +188,7 @@ supported; use the equivalent `https://` URL for public data.
 ## Development
 
 ```bash
-cargo test --workspace          # unit + CLI integration tests
+cargo test                     # unit + CLI integration tests
 cargo fmt --all --check         # formatting
 cargo clippy --all-targets --all-features -- -D warnings
 python tools/check_versions.py  # version consistency

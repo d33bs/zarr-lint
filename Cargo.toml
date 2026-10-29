@@ -1,7 +1,6 @@
 [workspace]
 members = [
-  "crates/zarr-lint-cli",
-  "crates/zarr-lint-core",
+  "crates/zarr-lint",
   "crates/zarr-lint-python",
 ]
 # The Python bindings crate is a pyo3 extension module: a plain `cargo build`
@@ -9,8 +8,7 @@ members = [
 # the default set. Build and test it through maturin instead. `cargo fmt` and
 # `cargo clippy` (check-only) still cover it via `--workspace`.
 default-members = [
-  "crates/zarr-lint-cli",
-  "crates/zarr-lint-core",
+  "crates/zarr-lint",
 ]
 resolver = "2"
 

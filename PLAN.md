@@ -1,5 +1,9 @@
 # Revised Initial Implementation Plan
 
+> The crate split in this initial plan is historical. The current implementation
+> uses one public `zarr-lint` crate for the library and CLI, plus private Python
+> bindings. See [docs/architecture.md](docs/architecture.md) for the current layout.
+
 ## Initial target: `v0.0.1`
 
 The first release will be `v0.0.1`, not `v0.1.0`.

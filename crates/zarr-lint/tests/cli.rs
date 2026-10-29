@@ -60,10 +60,9 @@ fn version_flag_reports_workspace_version() {
 }
 
 #[test]
-fn cli_and_core_versions_agree() {
-    // Both crates inherit the workspace version, so the CLI's compile-time
-    // version must match the core crate's exported VERSION constant.
-    assert_eq!(env!("CARGO_PKG_VERSION"), zarr_lint_core::VERSION);
+fn cli_and_library_versions_agree() {
+    // The binary and library are built from the same package version.
+    assert_eq!(env!("CARGO_PKG_VERSION"), zarr_lint::VERSION);
 }
 
 #[test]

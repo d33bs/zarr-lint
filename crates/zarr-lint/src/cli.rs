@@ -22,12 +22,12 @@
 
 use std::ffi::OsString;
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
-use zarr_lint_core::model::format_dims;
-use zarr_lint_core::{
+use crate::model::format_dims;
+use crate::{
     format_store, lint_store_with, load_store, plan_format_store, FormatPlan, Report, Severity,
     StoreOptions,
 };
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 const ABOUT: &str = "Inspect Zarr stores for structural and metadata problems.";
 
@@ -334,7 +334,7 @@ fn print_fmt_json(store: &str, mode: &str, plan: &FormatPlan) {
         .map(|change| change.rel_display.as_str())
         .collect();
     let report = serde_json::json!({
-        "version": zarr_lint_core::VERSION,
+        "version": crate::VERSION,
         "store": store,
         "mode": mode,
         "would_change": !plan.is_empty(),
@@ -389,7 +389,7 @@ fn run_inspect(args: InspectArgs) -> i32 {
 }
 
 fn print_version(verbose: bool) {
-    println!("zarr-lint {}", zarr_lint_core::VERSION);
+    println!("zarr-lint {}", crate::VERSION);
     if verbose {
         println!("commit: {}", env!("ZARRLINT_GIT_COMMIT"));
         println!(
